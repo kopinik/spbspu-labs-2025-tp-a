@@ -166,7 +166,7 @@ void sherkunov::min(const std::vector< Polygon >& polygons, std::istream& in, st
     in >> subcommand;
     out << std::fixed << std::setprecision(1);
 
-    std::map< std::string, std::function< double(const std::vector< Polygon >&) > > subcmds;
+    std::map< std::string, std::function< doubley(const std::vector< Polygon >&) > > subcmds;
     subcmds["AREA"] = maxArea;
     subcmds["VERTEXES"] = maxVertexes;
     auto it = subcmds.find(subcommand);
@@ -192,15 +192,16 @@ size_t sherkunov::minVertexes(const std::vector< Polygon >& polygons)
 
 void sherkunov::count(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
-    if (polygons.size() == 0)
+    if (polygons.empty()) 
     {
-        throw std::logic_error("<THERE ARE NO POLYGONS>");
+        out << "0";
+        return;
     }
     std::string subcommand;
     in >> subcommand;
-    out << std::fixed << std::setprecision(1);
+    
 
-    std::map< std::string, std::function< double(const std::vector< Polygon >&) > > subcmds;
+    std::map< std::string, std::function< size_t(const std::vector< Polygon >&) > > subcmds;
     subcmds["EVEN"] = countEven;
     subcmds["ODD"] = countOdd;
     auto it = subcmds.find(subcommand);
