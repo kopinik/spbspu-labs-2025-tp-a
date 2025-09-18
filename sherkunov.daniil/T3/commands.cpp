@@ -90,9 +90,9 @@ void sherkunov::area(const std::vector< Polygon >& polygons, std::istream& in, s
 
     if (subcommand == "EVEN")
     {
-
         out << areaEven(polygons);
-    } else
+    }
+     else
 	if (subcommand == "ODD")
 	{
         out << areaOdd(polygons);
