@@ -166,7 +166,7 @@ void sherkunov::min(const std::vector< Polygon >& polygons, std::istream& in, st
     in >> subcommand;
     out << std::fixed << std::setprecision(1);
 
-    std::map< std::string, std::function< doubley(const std::vector< Polygon >&) > > subcmds;
+    std::map< std::string, std::function< double(const std::vector< Polygon >&) > > subcmds;
     subcmds["AREA"] = maxArea;
     subcmds["VERTEXES"] = maxVertexes;
     auto it = subcmds.find(subcommand);
