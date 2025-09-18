@@ -83,55 +83,56 @@ double sherkunov::areaNum(const std::vector< Polygon >& polygons, size_t numOfVe
 
 void sherkunov::area(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
-    if (polygons.size() == 0)
-    {
-        throw std::logic_error("<THERE ARE NO POLYGONS>");
-    }
     std::string subcommand;
     in >> subcommand;
+    
     out << std::fixed << std::setprecision(1);
 
-    std::map< std::string, std::function< double(const std::vector<Polygon>&) > > subcmds;
-    subcmds["EVEN"] = areaEven;
-    subcmds["ODD"] = areaOdd;
-    subcmds["MEAN"] = areaMean;
-    auto it = subcmds.find(subcommand);
-    if (it != subcmds.end())
+    if (subcommand == "EVEN")
     {
-        out << it->second(polygons);
-    }
-    else
-    {
-        size_t numOfVertexes = std::stoull(subcommand);
-        if (numOfVertexes < 3)
-        {
+
+        out << areaEven(polygons);
+    } else 
+	if (subcommand == "ODD")
+	{
+        out << areaOdd(polygons);
+    	}
+	else if (subcommand == "MEAN")
+	{
+        if (polygons.empty())
+	{
+            out << "0.0";
+        }
+	else
+	{
+            out << areaMean(polygons);
+        }
+    } else {
+        try {
+            size_t numOfVertexes = std::stoull(subcommand);
+            if (numOfVertexes < 3) {
+                throw std::logic_error("<WRONG SUBCOMMAND>");
+            }
+            out << areaNum(polygons, numOfVertexes);
+        } catch (const std::exception&) {
             throw std::logic_error("<WRONG SUBCOMMAND>");
         }
-
-        out << areaNum(polygons, numOfVertexes);
     }
 }
-
 void sherkunov::max(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
-    if (polygons.size() == 0)
+    if (polygons.empty())
     {
         throw std::logic_error("<THERE ARE NO POLYGONS>");
     }
     std::string subcommand;
     in >> subcommand;
-    out << std::fixed << std::setprecision(1);
 
-    std::map< std::string, std::function< double(const std::vector< Polygon >&) > > subcmds;
-    subcmds["AREA"] = maxArea;
-    subcmds["VERTEXES"] = maxVertexes;
-    auto it = subcmds.find(subcommand);
-    if (it != subcmds.end())
-    {
-        out << it->second(polygons);
-    }
-    else
-    {
+    if (subcommand == "AREA") {
+        out << std::fixed << std::setprecision(1) << maxArea(polygons);
+    } else if (subcommand == "VERTEXES") {
+        out << maxVertexes(polygons); // Без форматирования для целых чисел
+    } else {
         throw std::logic_error("<WRONG SUBCOMMAND>");
     }
 }
@@ -158,24 +159,18 @@ size_t sherkunov::maxVertexes(const std::vector< Polygon >& polygons)
 
 void sherkunov::min(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
-    if (polygons.size() == 0)
+    if (polygons.empty())
     {
         throw std::logic_error("<THERE ARE NO POLYGONS>");
     }
     std::string subcommand;
     in >> subcommand;
-    out << std::fixed << std::setprecision(1);
 
-    std::map< std::string, std::function< double(const std::vector< Polygon >&) > > subcmds;
-    subcmds["AREA"] = maxArea;
-    subcmds["VERTEXES"] = maxVertexes;
-    auto it = subcmds.find(subcommand);
-    if (it != subcmds.end())
-    {
-        out << it->second(polygons);
-    }
-    else
-    {
+    if (subcommand == "AREA") {
+        out << std::fixed << std::setprecision(1) << minArea(polygons);
+    } else if (subcommand == "VERTEXES") {
+        out << minVertexes(polygons); // Без форматирования для целых чисел
+    } else {
         throw std::logic_error("<WRONG SUBCOMMAND>");
     }
 }
@@ -192,32 +187,23 @@ size_t sherkunov::minVertexes(const std::vector< Polygon >& polygons)
 
 void sherkunov::count(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
-    if (polygons.empty())
-    {
-        out << "0";
-        return;
-    }
     std::string subcommand;
     in >> subcommand;
-
-
-    std::map< std::string, std::function< size_t(const std::vector< Polygon >&) > > subcmds;
-    subcmds["EVEN"] = countEven;
-    subcmds["ODD"] = countOdd;
-    auto it = subcmds.find(subcommand);
-    if (it != subcmds.end())
-    {
-        out << it->second(polygons);
-    }
-    else
-    {
-        size_t numOfVertexes = std::stoull(subcommand);
-        if (numOfVertexes < 3)
-        {
+    
+    if (subcommand == "EVEN") {
+        out << countEven(polygons);
+    } else if (subcommand == "ODD") {
+        out << countOdd(polygons);
+    } else {
+        try {
+            size_t numOfVertexes = std::stoull(subcommand);
+            if (numOfVertexes < 3) {
+                throw std::logic_error("<WRONG SUBCOMMAND>");
+            }
+            out << countNum(polygons, numOfVertexes);
+        } catch (const std::exception&) {
             throw std::logic_error("<WRONG SUBCOMMAND>");
         }
-
-        out << countNum(polygons, numOfVertexes);
     }
 }
 
