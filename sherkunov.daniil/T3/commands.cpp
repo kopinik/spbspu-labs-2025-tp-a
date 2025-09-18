@@ -192,14 +192,14 @@ size_t sherkunov::minVertexes(const std::vector< Polygon >& polygons)
 
 void sherkunov::count(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
-    if (polygons.empty()) 
+    if (polygons.empty())
     {
         out << "0";
         return;
     }
     std::string subcommand;
     in >> subcommand;
-    
+
 
     std::map< std::string, std::function< size_t(const std::vector< Polygon >&) > > subcmds;
     subcmds["EVEN"] = countEven;
