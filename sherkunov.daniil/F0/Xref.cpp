@@ -33,7 +33,7 @@ void CrossReferenceSystem::buildReferences(const std::string& text_name, const s
 
     while (iss >> word) {
         // Очищаем слово от знаков препинания
-        word.erase(std::remove_if(word.begin(), word.end(), 
+        word.erase(std::remove_if(word.begin(), word.end(),
                  [](char c) { return !std::isalpha(c); }), word.end());
         if (!word.empty()) {
             std::transform(word.begin(), word.end(), word.begin(), ::tolower);
