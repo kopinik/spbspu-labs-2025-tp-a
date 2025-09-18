@@ -93,18 +93,18 @@ void sherkunov::area(const std::vector< Polygon >& polygons, std::istream& in, s
         out << areaEven(polygons);
     }
      else
-	if (subcommand == "ODD")
-	{
+  if (subcommand == "ODD")
+  {
         out << areaOdd(polygons);
-    	}
-	else if (subcommand == "MEAN")
-	{
+      }
+  else if (subcommand == "MEAN")
+  {
         if (polygons.empty())
-	{
+  {
             out << "0.0";
         }
-	else
-	{
+  else
+  {
             out << areaMean(polygons);
         }
     } else {
