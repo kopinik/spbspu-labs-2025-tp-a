@@ -85,14 +85,14 @@ void sherkunov::area(const std::vector< Polygon >& polygons, std::istream& in, s
 {
     std::string subcommand;
     in >> subcommand;
-    
+
     out << std::fixed << std::setprecision(1);
 
     if (subcommand == "EVEN")
     {
 
         out << areaEven(polygons);
-    } else 
+    } else
 	if (subcommand == "ODD")
 	{
         out << areaOdd(polygons);
@@ -189,7 +189,7 @@ void sherkunov::count(const std::vector< Polygon >& polygons, std::istream& in, 
 {
     std::string subcommand;
     in >> subcommand;
-    
+
     if (subcommand == "EVEN") {
         out << countEven(polygons);
     } else if (subcommand == "ODD") {
