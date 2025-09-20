@@ -40,14 +40,12 @@ public:
     void import(const std::string& filename);
     void export_text(const std::string& text_name, const std::string& filename);
     void stats(const std::string& text_name);
-
-    void double_replace(const std::string& text1_name, const std::string& text2_name,
-                       const std::string& word1, const std::string& word2);
+    void merge(const std::string& new_name, const std::string& name1, const std::string& name2);
 };
 
 int processCommandLineArguments(int argc, char** argv, CrossReferenceSystem& system);
-
 void runInteractiveMode(CrossReferenceSystem& system);
 
 }
+
 #endif
