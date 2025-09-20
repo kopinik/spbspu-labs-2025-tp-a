@@ -32,7 +32,7 @@ void CrossReferenceSystem::buildReferences(const std::string& text_name, const s
   size_t position = 0;
 
   while (iss >> word) {
-    word.erase(std::remove_if(word.begin(), word.end(), 
+    word.erase(std::remove_if(word.begin(), word.end(),
              [](char c) { return !std::isalpha(c); }), word.end());
 
     if (!word.empty()) {
@@ -346,7 +346,7 @@ void CrossReferenceSystem::merge(const std::string& new_name, const std::string&
     }
 
     if (new_data.references.find(word) != new_data.references.end()) {
-      new_data.references[word].insert(new_data.references[word].end(), 
+      new_data.references[word].insert(new_data.references[word].end(),
                                       shifted_positions.begin(), shifted_positions.end());
     } else {
       new_data.references[word] = shifted_positions;
