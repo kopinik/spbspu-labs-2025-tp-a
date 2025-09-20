@@ -221,3 +221,78 @@ size_t sherkunov::countNum(const std::vector< Polygon >& polygons, size_t numOfV
     using namespace std::placeholders;
     return std::count_if(polygons.begin(), polygons.end(), std::bind(isNum, _1, numOfVertexes));
 }
+void sherkunov::inframe(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
+{
+    if (polygons.empty())
+    {
+        throw std::logic_error("<THERE ARE NO POLYGONS>");
+    }
+
+    Polygon poly;
+    in >> poly;
+
+    int minX = std::numeric_limits<int>::max();
+    int maxX = std::numeric_limits<int>::min();
+    int minY = std::numeric_limits<int>::max();
+    int maxY = std::numeric_limits<int>::min();
+
+    for (const auto& polygon : polygons)
+    {
+        for (const auto& p : polygon.points)
+        {
+            minX = std::min(minX, p.x);
+            maxX = std::max(maxX, p.x);
+            minY = std::min(minY, p.y);
+            maxY = std::max(maxY, p.y);
+        }
+    }
+
+    for (const auto& p : poly.points)
+    {
+        if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY)
+        {
+            out << "<FALSE>";
+            return;
+        }
+    }
+
+    out << "<TRUE>";
+}
+
+void sherkunov::rightshapes(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
+{
+    size_t count = 0;
+
+    for (const auto& polygon : polygons)
+    {
+        const auto& points = polygon.points;
+        size_t n = points.size();
+        bool hasRightAngle = false;
+
+        for (size_t i = 0; i < n && !hasRightAngle; ++i)
+        {
+            const Point& a = points[i];
+            const Point& b = points[(i + 1) % n];
+            const Point& c = points[(i + 2) % n];
+
+            int abx = b.x - a.x;
+            int aby = b.y - a.y;
+            int bcx = c.x - b.x;
+            int bcy = c.y - b.y;
+
+            int dotProduct = abx * bcx + aby * bcy;
+
+            if (dotProduct == 0)
+            {
+                hasRightAngle = true;
+            }
+        }
+
+        if (hasRightAngle)
+        {
+            count++;
+        }
+    }
+
+    out << count;
+}

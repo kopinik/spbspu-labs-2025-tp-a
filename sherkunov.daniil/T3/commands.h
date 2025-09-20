@@ -36,6 +36,8 @@ namespace sherkunov
   size_t countEven(const std::vector< Polygon >&);
   size_t countOdd(const std::vector< Polygon >&);
   size_t countNum(const std::vector< Polygon >&, size_t);
+  void inframe(const std::vector< Polygon >&, std::istream&, std::ostream&);
+  void rightshapes(const std::vector< Polygon >&, std::istream&, std::ostream&);
 }
 
 #endif
