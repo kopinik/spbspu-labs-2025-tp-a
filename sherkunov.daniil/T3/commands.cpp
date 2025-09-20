@@ -7,6 +7,7 @@
 #include <functional>
 #include <numeric>
 #include "commands.h"
+#include "io-utils.h"
 
 double sherkunov::subArea(const Point& a, const Point& b)
 {
@@ -247,19 +248,16 @@ void sherkunov::inframe(const std::vector< Polygon >& polygons, std::istream& in
         }
     }
 
-    for (const auto& p : poly.points)
+    if (point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY)
     {
-        if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY)
-        {
-            out << "<FALSE>";
-            return;
-        }
+        out << "<TRUE>";
+    }
+    else
+    {
+        out << "<FALSE>";
     }
 
-    out << "<TRUE>";
-}
-
-void sherkunov::rightshapes(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
+void sherkunov::rightshapes(const std::vector< Polygon >& polygons, std::istream&, std::ostream& out)
 {
     size_t count = 0;
 
