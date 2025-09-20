@@ -68,9 +68,8 @@ double sherkunov::areaOdd(const std::vector< Polygon >& polygons)
 
 double sherkunov::areaMean(const std::vector< Polygon >& polygons)
 {
-    if (polygons.size() == 0)
-    {
-        throw std::logic_error("<THERE ARE NO POLYGONS>");
+    if (polygons.empty()) {
+        return 0.0;
     }
     return std::accumulate(polygons.begin(), polygons.end(), 0.0, meanAreaAccumulator) / polygons.size();
 }
@@ -101,7 +100,7 @@ void sherkunov::area(const std::vector< Polygon >& polygons, std::istream& in, s
   {
         if (polygons.empty())
   {
-            out << "0.0";
+            throw std::logic_error("<INVALID COMMAND>");
         }
   else
   {
