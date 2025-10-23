@@ -232,7 +232,6 @@ void sherkunov::inframe(const std::vector< Polygon >& polygons, std::istream& in
     Point point;
     in >> point;
 
-    // Находим границы всех полигонов
     int minX = std::numeric_limits<int>::max();
     int maxX = std::numeric_limits<int>::min();
     int minY = std::numeric_limits<int>::max();
