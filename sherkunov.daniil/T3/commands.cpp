@@ -275,15 +275,35 @@ void sherkunov::inframe(const std::vector< Polygon >& polygons, std::istream& in
   int minY = std::numeric_limits<int>::max();
   int maxY = std::numeric_limits<int>::min();
 
+  struct ByX
+  {
+    bool operator()(const Point& a, const Point& b) const
+    {
+      return a.x < b.x;
+    }
+  };
+  struct ByY
+  {
+    bool operator()(const Point& a, const Point& b) const
+    {
+      return a.y < b.y;
+    }
+  };
+
   for (const auto& polygon : polygons)
   {
-    for (const auto& p : polygon.points)
+    if (polygon.points.empty())
     {
-      minX = std::min(minX, p.x);
-      maxX = std::max(maxX, p.x);
-      minY = std::min(minY, p.y);
-      maxY = std::max(maxY, p.y);
+      continue;
     }
+
+    const auto minmaxX = std::minmax_element(polygon.points.begin(), polygon.points.end(), ByX{});
+    const auto minmaxY = std::minmax_element(polygon.points.begin(), polygon.points.end(), ByY{});
+
+    minX = std::min(minX, minmaxX.first->x);
+    maxX = std::max(maxX, minmaxX.second->x);
+    minY = std::min(minY, minmaxY.first->y);
+    maxY = std::max(maxY, minmaxY.second->y);
   }
 
   if (point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY)
