@@ -117,7 +117,6 @@ void CrossReferenceSystem::reconstruct(const std::string &text_name, const std::
   const TextData &data = it->second;
   std::vector<std::string> words = splitIntoWords(data.content);
 
-
   size_t max_position = 0;
   for (const auto &ref : data.references) {
     for (size_t pos : ref.second) {
@@ -156,11 +155,11 @@ void CrossReferenceSystem::concat(const std::string &new_name, const std::string
   }
 
   auto it1 = texts.find(name1);
-  if (it1 == texts.end()) {
+  if (it1 == std::end(texts)) {
     throw std::runtime_error("<NOT FOUND: " + name1 + ">");
   }
   auto it2 = texts.find(name2);
-  if (it2 == texts.end()) {
+  if (it2 == std::end(texts)) {
     throw std::runtime_error("<NOT FOUND: " + name2 + ">");
   }
 
@@ -318,6 +317,17 @@ void CrossReferenceSystem::export_text(const std::string &text_name, const std::
   outfile.close();
 }
 
+namespace {
+struct ByCountDesc
+{
+  bool operator()(const std::pair<std::string, size_t> &a,
+                  const std::pair<std::string, size_t> &b) const
+  {
+    return a.second > b.second;
+  }
+};
+}
+
 void CrossReferenceSystem::stats(const std::string &text_name)
 {
   auto it = texts.find(text_name);
@@ -336,8 +346,7 @@ void CrossReferenceSystem::stats(const std::string &text_name)
     word_counts.emplace_back(ref.first, ref.second.size());
   }
 
-  std::sort(word_counts.begin(), word_counts.end(),
-            [](const auto &a, const auto &b) { return a.second > b.second; });
+  std::sort(word_counts.begin(), word_counts.end(), ByCountDesc{});
 
   std::cout << "Top 5 words:" << std::endl;
   for (size_t i = 0; i < std::min<size_t>(5, word_counts.size()); ++i) {
@@ -486,8 +495,8 @@ void runInteractiveMode(CrossReferenceSystem &system)
           std::cout << "Word not found" << std::endl;
         } else {
           std::cout << "Positions: ";
-          for (size_t pos : positions) {
-            std::cout << pos << " ";
+          for (size_t pos2 : positions) {
+            std::cout << pos2 << " ";
           }
           std::cout << std::endl;
         }
