@@ -1,4 +1,5 @@
 #include "Xref.h"
+#include <stdexcept>
 
 namespace sherkunov
 {
@@ -29,26 +30,65 @@ bool CrossReferenceSystem::isValidWord(const std::string &word)
   return true;
 }
 
+std::vector<std::string> CrossReferenceSystem::splitIntoWords(const std::string &content)
+{
+  std::vector<std::string> words;
+  std::string current_word;
+
+  for (char c : content) {
+    if (std::isspace(static_cast<unsigned char>(c))) {
+      if (!current_word.empty()) {
+        words.push_back(current_word);
+        current_word.clear();
+      }
+    } else {
+      current_word += c;
+    }
+  }
+
+  if (!current_word.empty()) {
+    words.push_back(current_word);
+  }
+
+  return words;
+}
+
+std::string CrossReferenceSystem::joinWords(const std::vector<std::string> &words)
+{
+  if (words.empty()) {
+    return "";
+  }
+
+  std::string result = words[0];
+  for (size_t i = 1; i < words.size(); ++i) {
+    result += " " + words[i];
+  }
+
+  return result;
+}
+
 void CrossReferenceSystem::buildReferences(const std::string &text_name, const std::string &content)
 {
   TextData &data = texts[text_name];
   data.content = content;
   data.references.clear();
 
-  std::istringstream iss(content);
-  std::string word;
-  size_t position = 0;
+  std::vector<std::string> words = splitIntoWords(content);
 
-  while (iss >> word) {
-    word.erase(std::remove_if(word.begin(), word.end(),
-                              [](char c) { return !std::isalpha(c); }),
-               word.end());
+  for (size_t position = 0; position < words.size(); ++position) {
+    std::string word = words[position];
 
-    if (!word.empty()) {
-      std::transform(word.begin(), word.end(), word.begin(), ::tolower);
-      data.references[word].push_back(position);
+    std::string cleaned_word;
+    for (char c : word) {
+      if (std::isalpha(c)) {
+        cleaned_word += c;
+      }
     }
-    position++;
+
+    if (!cleaned_word.empty()) {
+      std::transform(cleaned_word.begin(), cleaned_word.end(), cleaned_word.begin(), ::tolower);
+      data.references[cleaned_word].push_back(position);
+    }
   }
 }
 
@@ -75,20 +115,20 @@ void CrossReferenceSystem::reconstruct(const std::string &text_name, const std::
   }
 
   const TextData &data = it->second;
-  std::istringstream iss(data.content);
-  std::vector<std::string> words;
-  std::string word;
+  std::vector<std::string> words = splitIntoWords(data.content);
 
-  while (iss >> word) {
-    words.push_back(word);
-  }
 
+  size_t max_position = 0;
   for (const auto &ref : data.references) {
     for (size_t pos : ref.second) {
-      if (pos >= words.size()) {
-        throw std::runtime_error("<CORRUPTED INDEX>");
+      if (pos > max_position) {
+        max_position = pos;
       }
     }
+  }
+
+  if (max_position >= words.size()) {
+    throw std::runtime_error("<CORRUPTED INDEX>");
   }
 
   if (output_file.empty()) {
@@ -111,7 +151,7 @@ void CrossReferenceSystem::concat(const std::string &new_name, const std::string
   if (!isValidName(new_name)) {
     throw std::runtime_error("<INVALID NAME>");
   }
-  if (texts.find(new_name) != std::end(texts)) {
+  if (texts.find(new_name) != texts.end()) {
     throw std::runtime_error("<ALREADY EXISTS>");
   }
 
@@ -167,12 +207,7 @@ void CrossReferenceSystem::replace(const std::string &text_name,
     throw std::runtime_error("<WORD NOT FOUND>");
   }
 
-  std::istringstream iss(data.content);
-  std::vector<std::string> words;
-  std::string word;
-  while (iss >> word) {
-    words.push_back(word);
-  }
+  std::vector<std::string> words = splitIntoWords(data.content);
 
   for (size_t pos : ref_it->second) {
     if (pos < words.size()) {
@@ -180,15 +215,8 @@ void CrossReferenceSystem::replace(const std::string &text_name,
     }
   }
 
-  std::ostringstream oss;
-  for (size_t i = 0; i < words.size(); ++i) {
-    if (i > 0) {
-      oss << " ";
-    }
-    oss << words[i];
-  }
-
-  buildReferences(text_name, oss.str());
+  std::string new_content = joinWords(words);
+  buildReferences(text_name, new_content);
 }
 
 void CrossReferenceSystem::insert(const std::string &text_name, size_t position, const std::string &word)
@@ -203,13 +231,7 @@ void CrossReferenceSystem::insert(const std::string &text_name, size_t position,
   }
 
   TextData &data = it->second;
-  std::istringstream iss(data.content);
-  std::vector<std::string> words;
-  std::string current_word;
-
-  while (iss >> current_word) {
-    words.push_back(current_word);
-  }
+  std::vector<std::string> words = splitIntoWords(data.content);
 
   if (position > words.size()) {
     throw std::runtime_error("<INVALID POSITION>");
@@ -217,15 +239,8 @@ void CrossReferenceSystem::insert(const std::string &text_name, size_t position,
 
   words.insert(words.begin() + position, word);
 
-  std::ostringstream oss;
-  for (size_t i = 0; i < words.size(); ++i) {
-    if (i > 0) {
-      oss << " ";
-    }
-    oss << words[i];
-  }
-
-  buildReferences(text_name, oss.str());
+  std::string new_content = joinWords(words);
+  buildReferences(text_name, new_content);
 }
 
 void CrossReferenceSystem::remove(const std::string &text_name, size_t start, size_t end)
@@ -236,13 +251,7 @@ void CrossReferenceSystem::remove(const std::string &text_name, size_t start, si
   }
 
   TextData &data = it->second;
-  std::istringstream iss(data.content);
-  std::vector<std::string> words;
-  std::string word;
-
-  while (iss >> word) {
-    words.push_back(word);
-  }
+  std::vector<std::string> words = splitIntoWords(data.content);
 
   if (start >= words.size() || end >= words.size() || start > end) {
     throw std::runtime_error("<INVALID RANGE>");
@@ -250,15 +259,8 @@ void CrossReferenceSystem::remove(const std::string &text_name, size_t start, si
 
   words.erase(words.begin() + start, words.begin() + end + 1);
 
-  std::ostringstream oss;
-  for (size_t i = 0; i < words.size(); ++i) {
-    if (i > 0) {
-      oss << " ";
-    }
-    oss << words[i];
-  }
-
-  buildReferences(text_name, oss.str());
+  std::string new_content = joinWords(words);
+  buildReferences(text_name, new_content);
 }
 
 void CrossReferenceSystem::import(const std::string &filename)
@@ -268,8 +270,14 @@ void CrossReferenceSystem::import(const std::string &filename)
     throw std::runtime_error("<FILE NOT FOUND>");
   }
 
-  std::string content((std::istreambuf_iterator<char>(infile)),
-                      std::istreambuf_iterator<char>());
+  std::string content;
+  std::string line;
+  while (std::getline(infile, line)) {
+    if (!content.empty()) {
+      content += "\n";
+    }
+    content += line;
+  }
 
   if (content.empty()) {
     throw std::runtime_error("<INVALID FORMAT>");
@@ -318,8 +326,10 @@ void CrossReferenceSystem::stats(const std::string &text_name)
   }
 
   const TextData &data = it->second;
+  std::vector<std::string> words = splitIntoWords(data.content);
+
   std::cout << "Total words: " << data.references.size() << std::endl;
-  std::cout << "Total occurrences: " << data.content.size() << std::endl;
+  std::cout << "Total occurrences: " << words.size() << std::endl;
 
   std::vector<std::pair<std::string, size_t>> word_counts;
   for (const auto &ref : data.references) {
@@ -358,12 +368,8 @@ void CrossReferenceSystem::merge(const std::string &new_name,
   const TextData &data1 = it1->second;
   const TextData &data2 = it2->second;
 
-  std::istringstream iss(data1.content);
-  size_t word_count1 = 0;
-  std::string token;
-  while (iss >> token) {
-    word_count1++;
-  }
+  std::vector<std::string> words1 = splitIntoWords(data1.content);
+  size_t word_count1 = words1.size();
 
   TextData new_data;
   new_data.content = data1.content + " " + data2.content;
@@ -429,37 +435,52 @@ void runInteractiveMode(CrossReferenceSystem &system)
       break;
     }
 
-    std::istringstream iss(command);
-    std::string cmd;
-    iss >> cmd;
+    if (command.empty()) {
+      continue;
+    }
+
+    size_t first_space = command.find(' ');
+    std::string cmd = (first_space == std::string::npos) ? command : command.substr(0, first_space);
+    std::string args = (first_space == std::string::npos) ? "" : command.substr(first_space + 1);
 
     try {
       if (cmd == "build") {
-        std::string name, content;
-        iss >> name;
-        std::getline(iss, content);
-        if (!content.empty() && content[0] == ' ') {
-          content = content.substr(1);
+        size_t name_end = args.find(' ');
+        if (name_end == std::string::npos) {
+          throw std::runtime_error("<INVALID ARGUMENTS>");
         }
+        std::string name = args.substr(0, name_end);
+        std::string content = args.substr(name_end + 1);
         system.build(name, content);
         std::cout << "OK" << std::endl;
       } else if (cmd == "reconstruct") {
-        std::string name, output_file;
-        iss >> name;
-        if (iss >> output_file) {
-          system.reconstruct(name, output_file);
+        size_t name_end = args.find(' ');
+        if (name_end == std::string::npos) {
+          system.reconstruct(args);
         } else {
-          system.reconstruct(name);
+          std::string name = args.substr(0, name_end);
+          std::string output_file = args.substr(name_end + 1);
+          system.reconstruct(name, output_file);
         }
         std::cout << "OK" << std::endl;
       } else if (cmd == "concat") {
-        std::string new_name, name1, name2;
-        iss >> new_name >> name1 >> name2;
+        size_t pos1 = args.find(' ');
+        size_t pos2 = args.find(' ', pos1 + 1);
+        if (pos1 == std::string::npos || pos2 == std::string::npos) {
+          throw std::runtime_error("<INVALID ARGUMENTS>");
+        }
+        std::string new_name = args.substr(0, pos1);
+        std::string name1 = args.substr(pos1 + 1, pos2 - pos1 - 1);
+        std::string name2 = args.substr(pos2 + 1);
         system.concat(new_name, name1, name2);
         std::cout << "OK" << std::endl;
       } else if (cmd == "search") {
-        std::string name, word;
-        iss >> name >> word;
+        size_t pos = args.find(' ');
+        if (pos == std::string::npos) {
+          throw std::runtime_error("<INVALID ARGUMENTS>");
+        }
+        std::string name = args.substr(0, pos);
+        std::string word = args.substr(pos + 1);
         auto positions = system.search(name, word);
         if (positions.empty()) {
           std::cout << "Word not found" << std::endl;
@@ -471,39 +492,61 @@ void runInteractiveMode(CrossReferenceSystem &system)
           std::cout << std::endl;
         }
       } else if (cmd == "replace") {
-        std::string name, old_word, new_word;
-        iss >> name >> old_word >> new_word;
+        size_t pos1 = args.find(' ');
+        size_t pos2 = args.find(' ', pos1 + 1);
+        if (pos1 == std::string::npos || pos2 == std::string::npos) {
+          throw std::runtime_error("<INVALID ARGUMENTS>");
+        }
+        std::string name = args.substr(0, pos1);
+        std::string old_word = args.substr(pos1 + 1, pos2 - pos1 - 1);
+        std::string new_word = args.substr(pos2 + 1);
         system.replace(name, old_word, new_word);
         std::cout << "OK" << std::endl;
       } else if (cmd == "insert") {
-        std::string name, word;
-        size_t position;
-        iss >> name >> position >> word;
+        size_t pos1 = args.find(' ');
+        size_t pos2 = args.find(' ', pos1 + 1);
+        if (pos1 == std::string::npos || pos2 == std::string::npos) {
+          throw std::runtime_error("<INVALID ARGUMENTS>");
+        }
+        std::string name = args.substr(0, pos1);
+        size_t position = std::stoul(args.substr(pos1 + 1, pos2 - pos1 - 1));
+        std::string word = args.substr(pos2 + 1);
         system.insert(name, position, word);
         std::cout << "OK" << std::endl;
       } else if (cmd == "remove") {
-        std::string name;
-        size_t start, end;
-        iss >> name >> start >> end;
+        size_t pos1 = args.find(' ');
+        size_t pos2 = args.find(' ', pos1 + 1);
+        if (pos1 == std::string::npos || pos2 == std::string::npos) {
+          throw std::runtime_error("<INVALID ARGUMENTS>");
+        }
+        std::string name = args.substr(0, pos1);
+        size_t start = std::stoul(args.substr(pos1 + 1, pos2 - pos1 - 1));
+        size_t end = std::stoul(args.substr(pos2 + 1));
         system.remove(name, start, end);
         std::cout << "OK" << std::endl;
       } else if (cmd == "import") {
-        std::string filename;
-        iss >> filename;
-        system.import(filename);
+        system.import(args);
         std::cout << "OK" << std::endl;
       } else if (cmd == "export") {
-        std::string name, filename;
-        iss >> name >> filename;
+        size_t pos = args.find(' ');
+        if (pos == std::string::npos) {
+          throw std::runtime_error("<INVALID ARGUMENTS>");
+        }
+        std::string name = args.substr(0, pos);
+        std::string filename = args.substr(pos + 1);
         system.export_text(name, filename);
         std::cout << "OK" << std::endl;
       } else if (cmd == "stats") {
-        std::string name;
-        iss >> name;
-        system.stats(name);
+        system.stats(args);
       } else if (cmd == "merge") {
-        std::string new_name, name1, name2;
-        iss >> new_name >> name1 >> name2;
+        size_t pos1 = args.find(' ');
+        size_t pos2 = args.find(' ', pos1 + 1);
+        if (pos1 == std::string::npos || pos2 == std::string::npos) {
+          throw std::runtime_error("<INVALID ARGUMENTS>");
+        }
+        std::string new_name = args.substr(0, pos1);
+        std::string name1 = args.substr(pos1 + 1, pos2 - pos1 - 1);
+        std::string name2 = args.substr(pos2 + 1);
         system.merge(new_name, name1, name2);
         std::cout << "OK" << std::endl;
       } else if (cmd == "exit" || cmd == "quit") {
