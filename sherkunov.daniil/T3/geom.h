@@ -5,16 +5,16 @@
 
 namespace sherkunov
 {
-    struct Point
-    {
-        int x;
-        int y;
-    };
+  struct Point
+  {
+      int x;
+      int y;
+  };
 
-    struct Polygon
-    {
-        std::vector< Point > points;
-    };
+  struct Polygon
+  {
+      std::vector< Point > points;
+  };
 }
 
 #endif
