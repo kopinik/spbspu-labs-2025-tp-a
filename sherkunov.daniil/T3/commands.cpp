@@ -54,11 +54,6 @@ double subArea(const Point& a, const Point& b)
   return a.x * b.y - a.y * b.x;
 }
 
-double subAreaOp(const Point& a, const Point& b)
-{
-  return subArea(a, b);
-}
-
 struct IsEvenPoly
 {
   bool operator()(const Polygon& p) const { return (p.points.size() % 2) == 0; }
@@ -184,6 +179,8 @@ double AreaOfPoly::operator()(double acc, const Polygon& polygon) const
     return acc;
   }
   double sum = std::inner_product(p.begin(), p.end() - 1, p.begin() + 1, 0.0, AddDouble{}, subAreaOp);
+  double sum = std::inner_product(p.begin(), p.end() - 1, p.begin() + 1,
+                                 0.0, AddDouble{}, &subArea);
   sum += subArea(p.back(), p.front());
   return acc + std::abs(sum) / 2.0;
 }
