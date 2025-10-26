@@ -9,66 +9,219 @@
 #include <string>
 #include <stdexcept>
 #include <cmath>
+#include <vector>
 #include "commands.h"
 #include "io-utils.h"
 
 namespace sherkunov
 {
 
+namespace
+{
+
+bool isDigitChar(char c)
+{
+  return std::isdigit(static_cast<unsigned char>(c)) != 0;
+}
+
+struct AddDouble
+{
+  double operator()(double a, double b) const { return a + b; }
+};
+
+struct MaxDouble
+{
+  double operator()(double a, double b) const { return (a < b) ? b : a; }
+};
+
+struct MinDouble
+{
+  double operator()(double a, double b) const { return (a < b) ? a : b; }
+};
+
+struct MaxSizeT
+{
+  size_t operator()(size_t a, size_t b) const { return (a < b) ? b : a; }
+};
+
+struct MinSizeT
+{
+  size_t operator()(size_t a, size_t b) const { return (a < b) ? a : b; }
+};
+
 double subArea(const Point& a, const Point& b)
 {
   return a.x * b.y - a.y * b.x;
 }
 
-static bool isDigitChar(char c)
+double subAreaOp(const Point& a, const Point& b)
 {
-  return std::isdigit(static_cast<unsigned char>(c)) != 0;
+  return subArea(a, b);
 }
 
-double areaPolygon(const Polygon& polygon)
+struct IsEvenPoly
+{
+  bool operator()(const Polygon& p) const { return (p.points.size() % 2) == 0; }
+};
+
+struct IsOddPoly
+{
+  bool operator()(const Polygon& p) const { return (p.points.size() % 2) == 1; }
+};
+
+struct IsNumPoly
+{
+  size_t n;
+  bool operator()(const Polygon& p) const { return p.points.size() == n; }
+};
+
+struct AreaOfPoly
+{
+  double operator()(double acc, const Polygon& p) const;
+};
+
+struct AreaOfPolyIf
+{
+  std::function<bool(const Polygon&)> pred;
+  double operator()(double acc, const Polygon& p) const
+  {
+    return pred(p) ? AreaOfPoly{}(acc, p) : acc;
+  }
+};
+
+struct CountIf
+{
+  std::function<bool(const Polygon&)> pred;
+  size_t operator()(size_t acc, const Polygon& p) const
+  {
+    return pred(p) ? acc + 1 : acc;
+  }
+};
+
+struct MaxAreaAcc
+{
+  double operator()(double acc, const Polygon& p) const
+  {
+    double a = 0.0;
+    AreaOfPoly{}(a, p);
+    return MaxDouble{}(acc, a);
+  }
+};
+
+struct MinAreaAcc
+{
+  double operator()(double acc, const Polygon& p) const
+  {
+    double a = 0.0;
+    AreaOfPoly{}(a, p);
+    return MinDouble{}(acc, a);
+  }
+};
+
+struct ByX
+{
+  bool operator()(const Point& a, const Point& b) const { return a.x < b.x; }
+};
+
+struct ByY
+{
+  bool operator()(const Point& a, const Point& b) const { return a.y < b.y; }
+};
+
+struct MakeIndexSeq
+{
+  size_t n;
+  std::vector< size_t > operator()() const
+  {
+    std::vector< size_t > idx(n);
+    size_t v = 0;
+    std::generate(idx.begin(), idx.end(), [&v]() { return v++; });
+    return idx;
+  }
+};
+
+struct RightAngleAt
+{
+  const std::vector<Point>* pts;
+
+  bool operator()(size_t i) const
+  {
+    const auto& p = *pts;
+    const size_t n = p.size();
+    const Point& a = p[(i + n - 1) % n];
+    const Point& b = p[i];
+    const Point& c = p[(i + 1) % n];
+    long long ux = static_cast< long long >(b.x) - a.x;
+    long long uy = static_cast< long long >(b.y) - a.y;
+    long long vx = static_cast< long long >(c.x) - b.x;
+    long long vy = static_cast< long long >(c.y) - b.y;
+    long long dot = ux * vx + uy * vy;
+    return dot == 0;
+  }
+};
+
+struct HasRightAngle
+{
+  bool operator()(const Polygon& poly) const
+  {
+    const auto& pts = poly.points;
+    if (pts.size() < 3)
+    {
+      return false;
+    }
+    std::vector< size_t > idx = MakeIndexSeq{ pts.size() }();
+    return std::any_of(idx.begin(), idx.end(), RightAngleAt{ &pts });
+  }
+};
+
+}
+
+double AreaOfPoly::operator()(double acc, const Polygon& polygon) const
 {
   const auto& p = polygon.points;
   if (p.size() < 2)
   {
-    return 0.0;
+    return acc;
   }
-  double sum = 0.0;
-  for (size_t i = 0; i + 1 < p.size(); ++i)
-  {
-    sum += subArea(p[i], p[i + 1]);
-  }
+  double sum = std::inner_product(p.begin(), p.end() - 1, p.begin() + 1, 0.0, AddDouble{}, subAreaOp);
   sum += subArea(p.back(), p.front());
-  return std::abs(sum) / 2.0;
+  return acc + std::abs(sum) / 2.0;
+}
+
+double areaPolygon(const Polygon& polygon)
+{
+  double acc = 0.0;
+  return AreaOfPoly{}(acc, polygon) - acc;
 }
 
 bool isEven(const Polygon& polygon)
 {
-  return (polygon.points.size() % 2) == 0;
+  return IsEvenPoly{}(polygon);
 }
 
 bool isOdd(const Polygon& polygon)
 {
-  return (polygon.points.size() % 2) == 1;
+  return IsOddPoly{}(polygon);
 }
 
 bool isNum(const Polygon& polygon, size_t n)
 {
-  return polygon.points.size() == n;
+  return IsNumPoly{ n }(polygon);
 }
 
 double evenAreaAccumulator(double acc, const Polygon& poly)
 {
-  return acc + (isEven(poly) ? areaPolygon(poly) : 0.0);
+  return AreaOfPolyIf{ IsEvenPoly{} }(acc, poly);
 }
 
 double oddAreaAccumulator(double acc, const Polygon& poly)
 {
-  return acc + (isOdd(poly) ? areaPolygon(poly) : 0.0);
+  return AreaOfPolyIf{ IsOddPoly{} }(acc, poly);
 }
 
 double meanAreaAccumulator(double acc, const Polygon& poly)
 {
-  return acc + areaPolygon(poly);
+  return AreaOfPoly{}(acc, poly);
 }
 
 double areaEven(const std::vector< Polygon >& polygons)
@@ -83,15 +236,7 @@ double areaOdd(const std::vector< Polygon >& polygons)
 
 double areaNum(const std::vector< Polygon >& polygons, size_t n)
 {
-  double sum = 0.0;
-  for (const auto& polygon : polygons)
-  {
-    if (isNum(polygon, n))
-    {
-      sum += areaPolygon(polygon);
-    }
-  }
-  return sum;
+  return std::accumulate(polygons.begin(), polygons.end(), 0.0, AreaOfPolyIf{ IsNumPoly{ n } });
 }
 
 double areaMean(const std::vector< Polygon >& polygons)
@@ -101,7 +246,7 @@ double areaMean(const std::vector< Polygon >& polygons)
     throw std::logic_error("<INVALID COMMAND>");
   }
   double sum = std::accumulate(polygons.begin(), polygons.end(), 0.0, meanAreaAccumulator);
-  return sum / static_cast<double>(polygons.size());
+  return sum / static_cast< double >(polygons.size());
 }
 
 void area(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
@@ -123,7 +268,10 @@ void area(const std::vector< Polygon >& polygons, std::istream& in, std::ostream
   }
   else
   {
-    if (subcommand.empty() || !std::all_of(subcommand.begin(), subcommand.end(), isDigitChar))
+    const bool allDigits = !subcommand.empty() &&
+      std::all_of(subcommand.begin(), subcommand.end(),
+                  [](char c){ return isDigitChar(c); });
+    if (!allDigits)
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
     }
@@ -147,36 +295,18 @@ void max(const std::vector< Polygon >& polygons, std::istream& in, std::ostream&
   if (what == "AREA")
   {
     out << std::fixed << std::setprecision(1);
-    out << maxArea(polygons);
+    out << std::accumulate(polygons.begin(), polygons.end(), 0.0, MaxAreaAcc{});
   }
   else if (what == "VERTEXES")
   {
-    out << maxVertexes(polygons);
+    size_t m = std::accumulate(polygons.begin(), polygons.end(), size_t{0},
+      [](size_t acc, const Polygon& p){ return MaxSizeT{}(acc, p.points.size()); });
+    out << m;
   }
   else
   {
     throw std::logic_error("<INVALID COMMAND>");
   }
-}
-
-double maxArea(const std::vector< Polygon >& polygons)
-{
-  double m = 0.0;
-  for (const auto& p : polygons)
-  {
-    m = std::max(m, areaPolygon(p));
-  }
-  return m;
-}
-
-size_t maxVertexes(const std::vector< Polygon >& polygons)
-{
-  size_t m = 0;
-  for (const auto& p : polygons)
-  {
-    m = std::max(m, p.points.size());
-  }
-  return m;
 }
 
 void min(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
@@ -190,44 +320,21 @@ void min(const std::vector< Polygon >& polygons, std::istream& in, std::ostream&
   if (what == "AREA")
   {
     out << std::fixed << std::setprecision(1);
-    out << minArea(polygons);
+    double start = std::numeric_limits< double >::infinity();
+    double m = std::accumulate(polygons.begin(), polygons.end(), start, MinAreaAcc{});
+    out << (std::isfinite(m) ? m : 0.0);
   }
   else if (what == "VERTEXES")
   {
-    out << minVertexes(polygons);
+    size_t start = std::numeric_limits< size_t >::max();
+    size_t m = std::accumulate(polygons.begin(), polygons.end(), start,
+      [](size_t acc, const Polygon& p){ return MinSizeT{}(acc, p.points.size()); });
+    out << (m == std::numeric_limits< size_t >::max() ? 0 : m);
   }
   else
   {
     throw std::logic_error("<INVALID COMMAND>");
   }
-}
-
-double minArea(const std::vector< Polygon >& polygons)
-{
-  double m = std::numeric_limits<double>::infinity();
-  for (const auto& p : polygons)
-  {
-    m = std::min(m, areaPolygon(p));
-  }
-  if (!std::isfinite(m))
-  {
-    return 0.0;
-  }
-  return m;
-}
-
-size_t minVertexes(const std::vector< Polygon >& polygons)
-{
-  if (polygons.empty())
-  {
-    return 0;
-  }
-  size_t m = std::numeric_limits<size_t>::max();
-  for (const auto& p : polygons)
-  {
-    m = std::min(m, p.points.size());
-  }
-  return m;
 }
 
 void count(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
@@ -236,15 +343,18 @@ void count(const std::vector< Polygon >& polygons, std::istream& in, std::ostrea
   in >> subcommand;
   if (subcommand == "EVEN")
   {
-    out << countEven(polygons);
+    out << std::accumulate(polygons.begin(), polygons.end(), size_t{0}, CountIf{ IsEvenPoly{} });
   }
   else if (subcommand == "ODD")
   {
-    out << countOdd(polygons);
+    out << std::accumulate(polygons.begin(), polygons.end(), size_t{0}, CountIf{ IsOddPoly{} });
   }
   else
   {
-    if (subcommand.empty() || !std::all_of(subcommand.begin(), subcommand.end(), isDigitChar))
+    const bool allDigits = !subcommand.empty() &&
+      std::all_of(subcommand.begin(), subcommand.end(),
+                  [](char c){ return isDigitChar(c); });
+    if (!allDigits)
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
     }
@@ -253,47 +363,8 @@ void count(const std::vector< Polygon >& polygons, std::istream& in, std::ostrea
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
     }
-    out << countNum(polygons, n);
+    out << std::accumulate(polygons.begin(), polygons.end(), size_t{0}, CountIf{ IsNumPoly{ n } });
   }
-}
-
-size_t countEven(const std::vector< Polygon >& polygons)
-{
-  size_t c = 0;
-  for (const auto& p : polygons)
-  {
-    if (isEven(p))
-    {
-      ++c;
-    }
-  }
-  return c;
-}
-
-size_t countOdd(const std::vector< Polygon >& polygons)
-{
-  size_t c = 0;
-  for (const auto& p : polygons)
-  {
-    if (isOdd(p))
-    {
-      ++c;
-    }
-  }
-  return c;
-}
-
-size_t countNum(const std::vector< Polygon >& polygons, size_t n)
-{
-  size_t c = 0;
-  for (const auto& p : polygons)
-  {
-    if (isNum(p, n))
-    {
-      ++c;
-    }
-  }
-  return c;
 }
 
 void inframe(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
@@ -302,35 +373,56 @@ void inframe(const std::vector< Polygon >& polygons, std::istream& in, std::ostr
   {
     throw std::logic_error("<THERE ARE NO POLYGONS>");
   }
+
   Point point;
   in >> point;
+
   int minX = std::numeric_limits< int >::max();
   int maxX = std::numeric_limits< int >::min();
   int minY = std::numeric_limits< int >::max();
   int maxY = std::numeric_limits< int >::min();
-  for (const auto& polygon : polygons)
+
+  struct PolyBounds
   {
-    if (polygon.points.empty())
+    int minx, maxx, miny, maxy;
+  };
+
+  struct BoundsOfPoly
+  {
+    PolyBounds operator()(const Polygon& poly) const
     {
-      continue;
+      PolyBounds pb;
+      if (poly.points.empty())
+      {
+        pb.minx = pb.maxx = pb.miny = pb.maxy = 0;
+        return pb;
+      }
+      auto xr = std::minmax_element(poly.points.begin(), poly.points.end(), ByX{});
+      auto yr = std::minmax_element(poly.points.begin(), poly.points.end(), ByY{});
+      pb.minx = xr.first->x;
+      pb.maxx = xr.second->x;
+      pb.miny = yr.first->y;
+      pb.maxy = yr.second->y;
+      return pb;
     }
-    int pminx = polygon.points.front().x;
-    int pmaxx = polygon.points.front().x;
-    int pminy = polygon.points.front().y;
-    int pmaxy = polygon.points.front().y;
-    for (size_t i = 1; i < polygon.points.size(); ++i)
+  };
+
+  struct AccBounds
+  {
+    int* minX; int* maxX; int* minY; int* maxY;
+    int operator()(int, const Polygon& p) const
     {
-      const Point& q = polygon.points[i];
-      pminx = std::min(pminx, q.x);
-      pmaxx = std::max(pmaxx, q.x);
-      pminy = std::min(pminy, q.y);
-      pmaxy = std::max(pmaxy, q.y);
+      PolyBounds pb = BoundsOfPoly{}(p);
+      *minX = std::min(*minX, pb.minx);
+      *maxX = std::max(*maxX, pb.maxx);
+      *minY = std::min(*minY, pb.miny);
+      *maxY = std::max(*maxY, pb.maxy);
+      return 0;
     }
-    minX = std::min(minX, pminx);
-    maxX = std::max(maxX, pmaxx);
-    minY = std::min(minY, pminy);
-    maxY = std::max(maxY, pmaxy);
-  }
+  };
+
+  (void)std::accumulate(polygons.begin(), polygons.end(), 0, AccBounds{ &minX, &maxX, &minY, &maxY });
+
   if (point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY)
   {
     out << "<TRUE>";
@@ -344,37 +436,15 @@ void inframe(const std::vector< Polygon >& polygons, std::istream& in, std::ostr
 void rightshapes(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
   (void)in;
-  size_t count = 0;
-  for (const auto& poly : polygons)
+  struct AddIfRight
   {
-    const auto& pts = poly.points;
-    if (pts.size() < 3)
+    size_t operator()(size_t acc, const Polygon& p) const
     {
-      continue;
+      return HasRightAngle{}(p) ? acc + 1 : acc;
     }
-    bool hasRightAngle = false;
-    for (size_t i = 0; i < pts.size(); ++i)
-    {
-      const Point& a = pts[(i + pts.size() - 1) % pts.size()];
-      const Point& b = pts[i];
-      const Point& c = pts[(i + 1) % pts.size()];
-      long long ux = b.x - a.x;
-      long long uy = b.y - a.y;
-      long long vx = c.x - b.x;
-      long long vy = c.y - b.y;
-      long long dot = ux * vx + uy * vy;
-      if (dot == 0)
-      {
-        hasRightAngle = true;
-        break;
-      }
-    }
-    if (hasRightAngle)
-    {
-      ++count;
-    }
-  }
-  out << count;
+  };
+  size_t cnt = std::accumulate(polygons.begin(), polygons.end(), size_t{0}, AddIfRight{});
+  out << cnt;
 }
 
 }
