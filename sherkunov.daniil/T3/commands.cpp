@@ -115,8 +115,7 @@ struct MaxAreaAcc
 {
   double operator()(double acc, const Polygon& p) const
   {
-    double a = 0.0;
-    AreaOfPoly{}(a, p);
+    double a = areaPolygon(p);
     return MaxDouble{}(acc, a);
   }
 };
@@ -125,8 +124,7 @@ struct MinAreaAcc
 {
   double operator()(double acc, const Polygon& p) const
   {
-    double a = 0.0;
-    AreaOfPoly{}(a, p);
+    double a = areaPolygon(p);
     return MinDouble{}(acc, a);
   }
 };
