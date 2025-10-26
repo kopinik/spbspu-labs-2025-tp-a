@@ -16,6 +16,11 @@
 namespace sherkunov
 {
 
+double subArea(const Point& a, const Point& b)
+{
+  return static_cast< double >(a.x) * b.y - static_cast< double >(a.y) * b.x;
+}
+
 namespace
 {
 
@@ -350,135 +355,4 @@ void min(const std::vector< Polygon >& polygons, std::istream& in, std::ostream&
     out << std::fixed << std::setprecision(1);
     double start = std::numeric_limits< double >::infinity();
     double m = std::accumulate(polygons.begin(), polygons.end(), start, MinAreaAcc{});
-    out << (std::isfinite(m) ? m : 0.0);
-  }
-  else if (what == "VERTEXES")
-  {
-    size_t start = std::numeric_limits< size_t >::max();
-    size_t m = std::accumulate(polygons.begin(), polygons.end(), start, AccMinVertex{});
-    out << (m == std::numeric_limits< size_t >::max() ? 0 : m);
-  }
-  else
-  {
-    throw std::logic_error("<INVALID COMMAND>");
-  }
-}
-
-void count(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
-{
-  std::string subcommand;
-  in >> subcommand;
-  if (subcommand == "EVEN")
-  {
-    out << std::accumulate(polygons.begin(), polygons.end(), size_t{ 0 }, CountIf{ &PredEven });
-  }
-  else if (subcommand == "ODD")
-  {
-    out << std::accumulate(polygons.begin(), polygons.end(), size_t{ 0 }, CountIf{ &PredOdd });
-  }
-  else
-  {
-    const bool allDigits = !subcommand.empty() &&
-      std::all_of(subcommand.begin(), subcommand.end(), isDigitChar);
-    if (!allDigits)
-    {
-      throw std::logic_error("<WRONG SUBCOMMAND>");
-    }
-    size_t n = std::stoull(subcommand);
-    if (n < 3)
-    {
-      throw std::logic_error("<WRONG SUBCOMMAND>");
-    }
-    struct CountIfNum
-    {
-      size_t n;
-      size_t operator()(size_t acc, const Polygon& p) const
-      {
-        return PredNumN(p, n) ? acc + 1 : acc;
-      }
-    };
-    out << std::accumulate(polygons.begin(), polygons.end(), size_t{ 0 }, CountIfNum{ n });
-  }
-}
-
-void inframe(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
-{
-  if (polygons.empty())
-  {
-    throw std::logic_error("<THERE ARE NO POLYGONS>");
-  }
-
-  Point point;
-  in >> point;
-
-  int minX = std::numeric_limits< int >::max();
-  int maxX = std::numeric_limits< int >::min();
-  int minY = std::numeric_limits< int >::max();
-  int maxY = std::numeric_limits< int >::min();
-
-  struct PolyBounds
-  {
-    int minx, maxx, miny, maxy;
-  };
-
-  struct BoundsOfPoly
-  {
-    PolyBounds operator()(const Polygon& poly) const
-    {
-      PolyBounds pb;
-      if (poly.points.empty())
-      {
-        pb.minx = pb.maxx = pb.miny = pb.maxy = 0;
-        return pb;
-      }
-      auto xr = std::minmax_element(poly.points.begin(), poly.points.end(), ByX{});
-      auto yr = std::minmax_element(poly.points.begin(), poly.points.end(), ByY{});
-      pb.minx = xr.first->x;
-      pb.maxx = xr.second->x;
-      pb.miny = yr.first->y;
-      pb.maxy = yr.second->y;
-      return pb;
-    }
-  };
-
-  struct AccBounds
-  {
-    int* minX; int* maxX; int* minY; int* maxY;
-    int operator()(int, const Polygon& p) const
-    {
-      PolyBounds pb = BoundsOfPoly{}(p);
-      *minX = std::min(*minX, pb.minx);
-      *maxX = std::max(*maxX, pb.maxx);
-      *minY = std::min(*minY, pb.miny);
-      *maxY = std::max(*maxY, pb.maxy);
-      return 0;
-    }
-  };
-
-  (void)std::accumulate(polygons.begin(), polygons.end(), 0, AccBounds{ &minX, &maxX, &minY, &maxY });
-
-  if (point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY)
-  {
-    out << "<TRUE>";
-  }
-  else
-  {
-    out << "<FALSE>";
-  }
-}
-
-void rightshapes(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
-{
-  (void)in;
-  struct AddIfRight
-  {
-    size_t operator()(size_t acc, const Polygon& p) const
-    {
-      return HasRightAngle{}(p) ? acc + 1 : acc;
-    }
-  };
-  size_t cnt = std::accumulate(polygons.begin(), polygons.end(), size_t{ 0 }, AddIfRight{});
-  out << cnt;
-}
-
-}
+    out << (std
