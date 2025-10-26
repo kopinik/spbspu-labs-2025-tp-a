@@ -79,13 +79,14 @@ std::ostream& sherkunov::operator<<(std::ostream& out, const Polygon& polygon)
   return out;
 }
 
-sherkunov::IoGuard::IoGuard(std::basic_ios< char >& s) :
+sherkunov::IoGuard::IoGuard(std::basic_ios< char >& s):
   s_(s),
   width_(s.width()),
   fill_(s.fill()),
   precision_(s.precision()),
   fmt_(s.flags())
 {
+
 }
 
 sherkunov::IoGuard::~IoGuard()

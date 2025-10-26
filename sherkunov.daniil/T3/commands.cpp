@@ -1,23 +1,44 @@
 #include <iostream>
-#include <sstream>
 #include <limits>
 #include <algorithm>
 #include <iomanip>
 #include <map>
 #include <functional>
+#include <numeric>
+#include <cctype>
+#include <string>
+#include <stdexcept>
+#include <cmath>
 #include "commands.h"
 #include "io-utils.h"
 
-double sherkunov::subArea(const Point& a, const Point& b)
+namespace sherkunov
+{
+
+double subArea(const Point& a, const Point& b)
 {
   return a.x * b.y - a.y * b.x;
 }
 
-double sherkunov::areaPolygon(const Polygon& polygon)
+static double subAreaOp(const Point& a, const Point& b)
+{
+  return subArea(a, b);
+}
+
+static bool isDigitChar(char c)
+{
+  return std::isdigit(static_cast<unsigned char>(c)) != 0;
+}
+
+double areaPolygon(const Polygon& polygon)
 {
   const auto& p = polygon.points;
+  if (p.size() < 2)
+  {
+    return 0.0;
+  }
   double sum = 0.0;
-  for (size_t i = 0; i < p.size() - 1; ++i)
+  for (size_t i = 0; i + 1 < p.size(); ++i)
   {
     sum += subArea(p[i], p[i + 1]);
   }
@@ -25,27 +46,52 @@ double sherkunov::areaPolygon(const Polygon& polygon)
   return std::abs(sum) / 2.0;
 }
 
-bool sherkunov::isEven(const Polygon& polygon)
+bool isEven(const Polygon& polygon)
 {
-  return polygon.points.size() % 2 == 0;
+  return (polygon.points.size() % 2) == 0;
 }
 
-bool sherkunov::isOdd(const Polygon& polygon)
+bool isOdd(const Polygon& polygon)
 {
-  return polygon.points.size() % 2 != 0;
+  return (polygon.points.size() % 2) == 1;
 }
 
-bool sherkunov::isNum(const Polygon& polygon, size_t numOfVertexes)
+bool isNum(const Polygon& polygon, size_t n)
 {
-  return polygon.points.size() == numOfVertexes;
+  return polygon.points.size() == n;
 }
 
-double sherkunov::areaEven(const std::vector< Polygon >& polygons)
+double evenAreaAccumulator(double acc, const Polygon& poly)
+{
+  return acc + (isEven(poly) ? areaPolygon(poly) : 0.0);
+}
+
+double oddAreaAccumulator(double acc, const Polygon& poly)
+{
+  return acc + (isOdd(poly) ? areaPolygon(poly) : 0.0);
+}
+
+double meanAreaAccumulator(double acc, const Polygon& poly)
+{
+  return acc + areaPolygon(poly);
+}
+
+double areaEven(const std::vector< Polygon >& polygons)
+{
+  return std::accumulate(polygons.begin(), polygons.end(), 0.0, evenAreaAccumulator);
+}
+
+double areaOdd(const std::vector< Polygon >& polygons)
+{
+  return std::accumulate(polygons.begin(), polygons.end(), 0.0, oddAreaAccumulator);
+}
+
+double areaNum(const std::vector< Polygon >& polygons, size_t n)
 {
   double sum = 0.0;
   for (const auto& polygon : polygons)
   {
-    if (isEven(polygon))
+    if (isNum(polygon, n))
     {
       sum += areaPolygon(polygon);
     }
@@ -53,53 +99,21 @@ double sherkunov::areaEven(const std::vector< Polygon >& polygons)
   return sum;
 }
 
-double sherkunov::areaOdd(const std::vector< Polygon >& polygons)
-{
-  double sum = 0.0;
-  for (const auto& polygon : polygons)
-  {
-    if (isOdd(polygon))
-    {
-      sum += areaPolygon(polygon);
-    }
-  }
-  return sum;
-}
-
-double sherkunov::areaMean(const std::vector< Polygon >& polygons)
+double areaMean(const std::vector< Polygon >& polygons)
 {
   if (polygons.empty())
   {
-    return 0.0;
+    throw std::logic_error("<INVALID COMMAND>");
   }
-  double sum = 0.0;
-  for (const auto& polygon : polygons)
-  {
-    sum += areaPolygon(polygon);
-  }
-  return sum / polygons.size();
+  double sum = std::accumulate(polygons.begin(), polygons.end(), 0.0, meanAreaAccumulator);
+  return sum / static_cast<double>(polygons.size());
 }
 
-double sherkunov::areaNum(const std::vector< Polygon >& polygons, size_t numOfVertexes)
-{
-  double sum = 0.0;
-  for (const auto& polygon : polygons)
-  {
-    if (isNum(polygon, numOfVertexes))
-    {
-      sum += areaPolygon(polygon);
-    }
-  }
-  return sum;
-}
-
-void sherkunov::area(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
+void area(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
   std::string subcommand;
   in >> subcommand;
-
   out << std::fixed << std::setprecision(1);
-
   if (subcommand == "EVEN")
   {
     out << areaEven(polygons);
@@ -110,114 +124,121 @@ void sherkunov::area(const std::vector< Polygon >& polygons, std::istream& in, s
   }
   else if (subcommand == "MEAN")
   {
-    if (polygons.empty())
-    {
-      throw std::logic_error("<INVALID COMMAND>");
-    }
-    else
-    {
-      out << areaMean(polygons);
-    }
+    out << areaMean(polygons);
   }
   else
   {
-    try
-    {
-      size_t numOfVertexes = std::stoull(subcommand);
-      if (numOfVertexes < 3)
-      {
-        throw std::logic_error("<WRONG SUBCOMMAND>");
-      }
-      out << areaNum(polygons, numOfVertexes);
-    }
-    catch (const std::exception&)
+    if (subcommand.empty() || !std::all_of(subcommand.begin(), subcommand.end(), isDigitChar))
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
     }
+    size_t n = std::stoull(subcommand);
+    if (n < 3)
+    {
+      throw std::logic_error("<WRONG SUBCOMMAND>");
+    }
+    out << areaNum(polygons, n);
   }
 }
 
-void sherkunov::max(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
+void max(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
+  std::string what;
+  in >> what;
   if (polygons.empty())
   {
     throw std::logic_error("<THERE ARE NO POLYGONS>");
   }
-  std::string subcommand;
-  in >> subcommand;
-
-  if (subcommand == "AREA")
+  if (what == "AREA")
   {
-    out << std::fixed << std::setprecision(1) << maxArea(polygons);
+    out << std::fixed << std::setprecision(1);
+    out << maxArea(polygons);
   }
-  else if (subcommand == "VERTEXES")
+  else if (what == "VERTEXES")
   {
     out << maxVertexes(polygons);
   }
   else
   {
-    throw std::logic_error("<WRONG SUBCOMMAND>");
+    throw std::logic_error("<INVALID COMMAND>");
   }
 }
 
-bool sherkunov::areaComparator(const Polygon& a, const Polygon& b)
+double maxArea(const std::vector< Polygon >& polygons)
 {
-  return areaPolygon(a) < areaPolygon(b);
+  double m = 0.0;
+  for (const auto& p : polygons)
+  {
+    m = std::max(m, areaPolygon(p));
+  }
+  return m;
 }
 
-double sherkunov::maxArea(const std::vector< Polygon >& polygons)
+size_t maxVertexes(const std::vector< Polygon >& polygons)
 {
-  return areaPolygon(*std::max_element(polygons.begin(), polygons.end(), areaComparator));
+  size_t m = 0;
+  for (const auto& p : polygons)
+  {
+    m = std::max(m, p.points.size());
+  }
+  return m;
 }
 
-bool sherkunov::vertexesComparator(const Polygon& a, const Polygon& b)
+void min(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
-  return a.points.size() < b.points.size();
-}
-
-size_t sherkunov::maxVertexes(const std::vector< Polygon >& polygons)
-{
-  return (*std::max_element(polygons.begin(), polygons.end(), vertexesComparator)).points.size();
-}
-
-void sherkunov::min(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
-{
+  std::string what;
+  in >> what;
   if (polygons.empty())
   {
     throw std::logic_error("<THERE ARE NO POLYGONS>");
   }
-  std::string subcommand;
-  in >> subcommand;
-
-  if (subcommand == "AREA")
+  if (what == "AREA")
   {
-    out << std::fixed << std::setprecision(1) << minArea(polygons);
+    out << std::fixed << std::setprecision(1);
+    out << minArea(polygons);
   }
-  else if (subcommand == "VERTEXES")
+  else if (what == "VERTEXES")
   {
     out << minVertexes(polygons);
   }
   else
   {
-    throw std::logic_error("<WRONG SUBCOMMAND>");
+    throw std::logic_error("<INVALID COMMAND>");
   }
 }
 
-double sherkunov::minArea(const std::vector< Polygon >& polygons)
+double minArea(const std::vector< Polygon >& polygons)
 {
-  return areaPolygon(*std::min_element(polygons.begin(), polygons.end(), areaComparator));
+  double m = std::numeric_limits<double>::infinity();
+  for (const auto& p : polygons)
+  {
+    m = std::min(m, areaPolygon(p));
+  }
+  if (!std::isfinite(m))
+  {
+    return 0.0;
+  }
+  return m;
 }
 
-size_t sherkunov::minVertexes(const std::vector< Polygon >& polygons)
+size_t minVertexes(const std::vector< Polygon >& polygons)
 {
-  return (*std::min_element(polygons.begin(), polygons.end(), vertexesComparator)).points.size();
+  if (polygons.empty())
+  {
+    return 0;
+  }
+  size_t m = std::numeric_limits<size_t>::max();
+  for (const auto& p : polygons)
+  {
+    m = std::min(m, p.points.size());
+  }
+  return m;
 }
 
-void sherkunov::count(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
+void count(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
   std::string subcommand;
   in >> subcommand;
-
   if (subcommand == "EVEN")
   {
     out << countEven(polygons);
@@ -228,84 +249,93 @@ void sherkunov::count(const std::vector< Polygon >& polygons, std::istream& in, 
   }
   else
   {
-    try
-    {
-      size_t numOfVertexes = std::stoull(subcommand);
-      if (numOfVertexes < 3)
-      {
-        throw std::logic_error("<WRONG SUBCOMMAND>");
-      }
-      out << countNum(polygons, numOfVertexes);
-    }
-    catch (const std::exception&)
+    if (subcommand.empty() || !std::all_of(subcommand.begin(), subcommand.end(), isDigitChar))
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
     }
+    size_t n = std::stoull(subcommand);
+    if (n < 3)
+    {
+      throw std::logic_error("<WRONG SUBCOMMAND>");
+    }
+    out << countNum(polygons, n);
   }
 }
 
-size_t sherkunov::countEven(const std::vector< Polygon >& polygons)
+size_t countEven(const std::vector< Polygon >& polygons)
 {
-  return std::count_if(polygons.begin(), polygons.end(), isEven);
+  size_t c = 0;
+  for (const auto& p : polygons)
+  {
+    if (isEven(p))
+    {
+      ++c;
+    }
+  }
+  return c;
 }
 
-size_t sherkunov::countOdd(const std::vector< Polygon >& polygons)
+size_t countOdd(const std::vector< Polygon >& polygons)
 {
-  return std::count_if(polygons.begin(), polygons.end(), isOdd);
+  size_t c = 0;
+  for (const auto& p : polygons)
+  {
+    if (isOdd(p))
+    {
+      ++c;
+    }
+  }
+  return c;
 }
 
-size_t sherkunov::countNum(const std::vector< Polygon >& polygons, size_t numOfVertexes)
+size_t countNum(const std::vector< Polygon >& polygons, size_t n)
 {
-  using namespace std::placeholders;
-  return std::count_if(polygons.begin(), polygons.end(), std::bind(isNum, _1, numOfVertexes));
+  size_t c = 0;
+  for (const auto& p : polygons)
+  {
+    if (isNum(p, n))
+    {
+      ++c;
+    }
+  }
+  return c;
 }
 
-void sherkunov::inframe(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
+void inframe(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
   if (polygons.empty())
   {
     throw std::logic_error("<THERE ARE NO POLYGONS>");
   }
-
   Point point;
   in >> point;
-
-  int minX = std::numeric_limits<int>::max();
-  int maxX = std::numeric_limits<int>::min();
-  int minY = std::numeric_limits<int>::max();
-  int maxY = std::numeric_limits<int>::min();
-
-  struct ByX
-  {
-    bool operator()(const Point& a, const Point& b) const
-    {
-      return a.x < b.x;
-    }
-  };
-  struct ByY
-  {
-    bool operator()(const Point& a, const Point& b) const
-    {
-      return a.y < b.y;
-    }
-  };
-
+  int minX = std::numeric_limits< int >::max();
+  int maxX = std::numeric_limits< int >::min();
+  int minY = std::numeric_limits< int >::max();
+  int maxY = std::numeric_limits< int >::min();
   for (const auto& polygon : polygons)
   {
     if (polygon.points.empty())
     {
       continue;
     }
-
-    const auto minmaxX = std::minmax_element(polygon.points.begin(), polygon.points.end(), ByX{});
-    const auto minmaxY = std::minmax_element(polygon.points.begin(), polygon.points.end(), ByY{});
-
-    minX = std::min(minX, minmaxX.first->x);
-    maxX = std::max(maxX, minmaxX.second->x);
-    minY = std::min(minY, minmaxY.first->y);
-    maxY = std::max(maxY, minmaxY.second->y);
+    int pminx = polygon.points.front().x;
+    int pmaxx = polygon.points.front().x;
+    int pminy = polygon.points.front().y;
+    int pmaxy = polygon.points.front().y;
+    for (size_t i = 1; i < polygon.points.size(); ++i)
+    {
+      const Point& q = polygon.points[i];
+      pminx = std::min(pminx, q.x);
+      pmaxx = std::max(pmaxx, q.x);
+      pminy = std::min(pminy, q.y);
+      pmaxy = std::max(pmaxy, q.y);
+    }
+    minX = std::min(minX, pminx);
+    maxX = std::max(maxX, pmaxx);
+    minY = std::min(minY, pminy);
+    maxY = std::max(maxY, pmaxy);
   }
-
   if (point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY)
   {
     out << "<TRUE>";
@@ -316,39 +346,40 @@ void sherkunov::inframe(const std::vector< Polygon >& polygons, std::istream& in
   }
 }
 
-void sherkunov::rightshapes(const std::vector< Polygon >& polygons, std::istream&, std::ostream& out)
+void rightshapes(const std::vector< Polygon >& polygons, std::istream& in, std::ostream& out)
 {
+  (void)in;
   size_t count = 0;
-  for (const auto& polygon : polygons)
+  for (const auto& poly : polygons)
   {
-    const auto& points = polygon.points;
-    size_t n = points.size();
-    bool hasRightAngle = false;
-
-    for (size_t i = 0; i < n && !hasRightAngle; ++i)
+    const auto& pts = poly.points;
+    if (pts.size() < 3)
     {
-      const Point& a = points[i];
-      const Point& b = points[(i + 1) % n];
-      const Point& c = points[(i + 2) % n];
-
-      int abx = b.x - a.x;
-      int aby = b.y - a.y;
-      int bcx = c.x - b.x;
-      int bcy = c.y - b.y;
-
-      int dotProduct = abx * bcx + aby * bcy;
-
-      if (dotProduct == 0)
+      continue;
+    }
+    bool hasRightAngle = false;
+    for (size_t i = 0; i < pts.size(); ++i)
+    {
+      const Point& a = pts[(i + pts.size() - 1) % pts.size()];
+      const Point& b = pts[i];
+      const Point& c = pts[(i + 1) % pts.size()];
+      long long ux = b.x - a.x;
+      long long uy = b.y - a.y;
+      long long vx = c.x - b.x;
+      long long vy = c.y - b.y;
+      long long dot = ux * vx + uy * vy;
+      if (dot == 0)
       {
         hasRightAngle = true;
+        break;
       }
     }
-
     if (hasRightAngle)
     {
-      count++;
+      ++count;
     }
   }
-
   out << count;
+}
+
 }

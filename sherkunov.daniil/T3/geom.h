@@ -7,13 +7,13 @@ namespace sherkunov
 {
   struct Point
   {
-      int x;
-      int y;
+    int x;
+    int y;
   };
 
   struct Polygon
   {
-      std::vector< Point > points;
+    std::vector< Point > points;
   };
 }
 
