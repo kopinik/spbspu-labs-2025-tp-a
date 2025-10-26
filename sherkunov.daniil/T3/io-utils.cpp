@@ -7,13 +7,13 @@ std::istream& sherkunov::operator>>(std::istream& in, DelimiterIO&& dest)
   std::istream::sentry sentry(in);
   if (!sentry)
   {
-      return in;
+    return in;
   }
   char c = '0';
   in >> c;
   if (in && (c != dest.exp))
   {
-      in.setstate(std::ios::failbit);
+    in.setstate(std::ios::failbit);
   }
   return in;
 }
@@ -23,7 +23,7 @@ std::istream& sherkunov::operator>>(std::istream& in, Point& point)
   std::istream::sentry sentry(in);
   if (!sentry)
   {
-      return in;
+    return in;
   }
   return in >> DelimiterIO{ '(' } >> point.x >> DelimiterIO{ ';' } >> point.y >> DelimiterIO{ ')' };
 }
@@ -33,20 +33,20 @@ std::istream& sherkunov::operator>>(std::istream& in, Polygon& polygon)
   std::istream::sentry sentry(in);
   if (!sentry)
   {
-      return in;
+    return in;
   }
   size_t vertexesCount = 0;
   if (!(in >> vertexesCount) || vertexesCount < 3)
   {
-      in.setstate(std::ios::failbit);
-      return in;
+    in.setstate(std::ios::failbit);
+    return in;
   }
   std::vector< Point > points(vertexesCount);
   std::copy_n(std::istream_iterator< Point >(in), vertexesCount, points.begin());
   if (!in)
   {
-      in.setstate(std::ios::failbit);
-      return in;
+    in.setstate(std::ios::failbit);
+    return in;
   }
   polygon.points = points;
   return in;
@@ -57,7 +57,7 @@ std::ostream& sherkunov::operator<<(std::ostream& out, const Point& point)
   std::ostream::sentry sentry(out);
   if (!sentry)
   {
-      return out;
+    return out;
   }
   IoGuard guard(out);
   return out << '(' << point.x << ';' << point.y << ')';
@@ -68,14 +68,16 @@ std::ostream& sherkunov::operator<<(std::ostream& out, const Polygon& polygon)
   std::ostream::sentry sentry(out);
   if (!sentry)
   {
-      return out;
+    return out;
   }
   IoGuard guard(out);
   out << polygon.points.size();
-  for (size_t i = 0; i < polygon.points.size(); ++i)
+  struct PrintWithSpace
   {
-      out << ' ' << polygon.points[i];
-  }
+    std::ostream* o;
+    void operator()(const Point& p) const { (*o) << ' ' << p; }
+  };
+  std::for_each(polygon.points.begin(), polygon.points.end(), PrintWithSpace{ &out });
   return out;
 }
 
@@ -86,7 +88,6 @@ sherkunov::IoGuard::IoGuard(std::basic_ios< char >& s):
   precision_(s.precision()),
   fmt_(s.flags())
 {
-
 }
 
 sherkunov::IoGuard::~IoGuard()

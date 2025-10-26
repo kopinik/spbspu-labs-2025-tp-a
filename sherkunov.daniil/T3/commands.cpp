@@ -26,48 +26,76 @@ namespace
 
 bool isDigitChar(char c)
 {
-  return std::isdigit(static_cast< unsigned char >(c)) != 0;
+  bool operator()(char c) const
+  {
+    return c >= '0' && c <= '9';
+  }
 }
 
 struct AddDouble
 {
-  double operator()(double a, double b) const { return a + b; }
+  double operator()(double a, double b) const
+  {
+    return a + b;
+  }
 };
 
 struct MaxDouble
 {
-  double operator()(double a, double b) const { return (a < b) ? b : a; }
+  double operator()(double a, double b) const
+  {
+    return (a < b) ? b : a;
+  }
+
 };
 
 struct MinDouble
 {
-  double operator()(double a, double b) const { return (a < b) ? a : b; }
+  double operator()(double a, double b) const
+  {
+    return (a < b) ? a : b;
+  }
 };
 
 struct MaxSizeT
 {
-  size_t operator()(size_t a, size_t b) const { return (a < b) ? b : a; }
+  size_t operator()(size_t a, size_t b) const
+  {
+    return (a < b) ? b : a;
+  }
 };
 
 struct MinSizeT
 {
-  size_t operator()(size_t a, size_t b) const { return (a < b) ? a : b; }
+  size_t operator()(size_t a, size_t b) const
+  {
+    return (a < b) ? a : b;
+  }
 };
 
 struct IsEvenPoly
 {
-  bool operator()(const Polygon& p) const { return (p.points.size() % 2) == 0; }
+  bool operator()(const Polygon& p) const
+  {
+	return (p.points.size() % 2) == 0;
+  }
 };
 
 struct IsOddPoly
 {
-  bool operator()(const Polygon& p) const { return (p.points.size() % 2) == 1; }
+  bool operator()(const Polygon& p) const
+  {
+	return (p.points.size() % 2) == 1;
+  }
 };
 
 struct IsNumPoly
 {
   size_t n;
-  bool operator()(const Polygon& p) const { return p.points.size() == n; }
+  bool operator()(const Polygon& p) const
+  {
+	return p.points.size() == n;
+  }
 };
 
 struct AreaOfPoly
@@ -131,18 +159,27 @@ struct MinAreaAcc
 
 struct ByX
 {
-  bool operator()(const Point& a, const Point& b) const { return a.x < b.x; }
+  bool operator()(const Point& a, const Point& b) const
+  {
+	return a.x < b.x;
+  }
 };
 
 struct ByY
 {
-  bool operator()(const Point& a, const Point& b) const { return a.y < b.y; }
+  bool operator()(const Point& a, const Point& b) const
+  {
+    return a.y < b.y;
+  }
 };
 
 struct SeqGen
 {
   size_t v;
-  size_t operator()() { return v++; }
+  size_t operator()()
+  {
+    return v++;
+  }
 };
 
 struct MakeIndexSeq
@@ -207,9 +244,18 @@ struct AccMinVertex
   }
 };
 
-bool PredEven(const Polygon& p) { return IsEvenPoly{}(p); }
-bool PredOdd(const Polygon& p) { return IsOddPoly{}(p); }
-bool PredNumN(const Polygon& p, size_t n) { return IsNumPoly{ n }(p); }
+bool PredEven(const Polygon& p)
+{
+  return IsEvenPoly{}(p);
+}
+bool PredOdd(const Polygon& p)
+{
+  return IsOddPoly{}(p);
+}
+bool PredNumN(const Polygon& p, size_t n)
+{
+  return IsNumPoly{ n }(p);
+}
 
 }
 
@@ -302,7 +348,7 @@ void area(const std::vector< Polygon >& polygons, std::istream& in, std::ostream
   else
   {
     const bool allDigits = !subcommand.empty() &&
-      std::all_of(subcommand.begin(), subcommand.end(), isDigitChar);
+      std::all_of(subcommand.begin(), subcommand.end(), isDigitChar{});
     if (!allDigits)
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
