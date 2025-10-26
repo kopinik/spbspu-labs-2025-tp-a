@@ -21,7 +21,7 @@ namespace
 
 bool isDigitChar(char c)
 {
-  return std::isdigit(static_cast<unsigned char>(c)) != 0;
+  return std::isdigit(static_cast< unsigned char >(c)) != 0;
 }
 
 struct AddDouble
@@ -49,11 +49,6 @@ struct MinSizeT
   size_t operator()(size_t a, size_t b) const { return (a < b) ? a : b; }
 };
 
-double subArea(const Point& a, const Point& b)
-{
-  return a.x * b.y - a.y * b.x;
-}
-
 struct IsEvenPoly
 {
   bool operator()(const Polygon& p) const { return (p.points.size() % 2) == 0; }
@@ -72,12 +67,30 @@ struct IsNumPoly
 
 struct AreaOfPoly
 {
-  double operator()(double acc, const Polygon& p) const;
+  double operator()(double acc, const Polygon& polygon) const
+  {
+    const auto& p = polygon.points;
+    if (p.size() < 2)
+    {
+      return acc;
+    }
+
+    double sum = std::inner_product(
+      p.begin(), p.end() - 1,
+      p.begin() + 1,
+      0.0,
+      AddDouble{},
+      &::sherkunov::subArea
+    );
+
+    sum += ::sherkunov::subArea(p.back(), p.front());
+    return acc + std::abs(sum) / 2.0;
+  }
 };
 
 struct AreaOfPolyIf
 {
-  std::function<bool(const Polygon&)> pred;
+  bool (*pred)(const Polygon&);
   double operator()(double acc, const Polygon& p) const
   {
     return pred(p) ? AreaOfPoly{}(acc, p) : acc;
@@ -86,7 +99,7 @@ struct AreaOfPolyIf
 
 struct CountIf
 {
-  std::function<bool(const Polygon&)> pred;
+  bool (*pred)(const Polygon&);
   size_t operator()(size_t acc, const Polygon& p) const
   {
     return pred(p) ? acc + 1 : acc;
@@ -123,21 +136,27 @@ struct ByY
   bool operator()(const Point& a, const Point& b) const { return a.y < b.y; }
 };
 
+struct SeqGen
+{
+  size_t v;
+  size_t operator()() { return v++; }
+};
+
 struct MakeIndexSeq
 {
   size_t n;
   std::vector< size_t > operator()() const
   {
     std::vector< size_t > idx(n);
-    size_t v = 0;
-    std::generate(idx.begin(), idx.end(), [&v]() { return v++; });
+    SeqGen g{ 0 };
+    std::generate(idx.begin(), idx.end(), g);
     return idx;
   }
 };
 
 struct RightAngleAt
 {
-  const std::vector<Point>* pts;
+  const std::vector< Point >* pts;
 
   bool operator()(size_t i) const
   {
@@ -169,28 +188,27 @@ struct HasRightAngle
   }
 };
 
-}
-
-double AreaOfPoly::operator()(double acc, const Polygon& polygon) const
+struct AccMaxVertex
 {
-  const auto& p = polygon.points;
-  if (p.size() < 2)
+  size_t operator()(size_t acc, const Polygon& p) const
   {
-    return acc;
+    return MaxSizeT{}(acc, p.points.size());
   }
+};
 
-  double sum = std::inner_product(
-    p.begin(), p.end() - 1,
-    p.begin() + 1,
-    0.0,
-    AddDouble{},
-    &subArea
-  );
+struct AccMinVertex
+{
+  size_t operator()(size_t acc, const Polygon& p) const
+  {
+    return MinSizeT{}(acc, p.points.size());
+  }
+};
 
-  sum += subArea(p.back(), p.front());
-  return acc + std::abs(sum) / 2.0;
+bool PredEven(const Polygon& p) { return IsEvenPoly{}(p); }
+bool PredOdd(const Polygon& p) { return IsOddPoly{}(p); }
+bool PredNumN(const Polygon& p, size_t n) { return IsNumPoly{ n }(p); }
+
 }
-
 
 double areaPolygon(const Polygon& polygon)
 {
@@ -215,12 +233,12 @@ bool isNum(const Polygon& polygon, size_t n)
 
 double evenAreaAccumulator(double acc, const Polygon& poly)
 {
-  return AreaOfPolyIf{ IsEvenPoly{} }(acc, poly);
+  return AreaOfPolyIf{ &PredEven }(acc, poly);
 }
 
 double oddAreaAccumulator(double acc, const Polygon& poly)
 {
-  return AreaOfPolyIf{ IsOddPoly{} }(acc, poly);
+  return AreaOfPolyIf{ &PredOdd }(acc, poly);
 }
 
 double meanAreaAccumulator(double acc, const Polygon& poly)
@@ -240,7 +258,15 @@ double areaOdd(const std::vector< Polygon >& polygons)
 
 double areaNum(const std::vector< Polygon >& polygons, size_t n)
 {
-  return std::accumulate(polygons.begin(), polygons.end(), 0.0, AreaOfPolyIf{ IsNumPoly{ n } });
+  struct AreaOfPolyIfNum
+  {
+    size_t n;
+    double operator()(double acc, const Polygon& p) const
+    {
+      return PredNumN(p, n) ? AreaOfPoly{}(acc, p) : acc;
+    }
+  };
+  return std::accumulate(polygons.begin(), polygons.end(), 0.0, AreaOfPolyIfNum{ n });
 }
 
 double areaMean(const std::vector< Polygon >& polygons)
@@ -273,8 +299,7 @@ void area(const std::vector< Polygon >& polygons, std::istream& in, std::ostream
   else
   {
     const bool allDigits = !subcommand.empty() &&
-      std::all_of(subcommand.begin(), subcommand.end(),
-                  [](char c){ return isDigitChar(c); });
+      std::all_of(subcommand.begin(), subcommand.end(), isDigitChar);
     if (!allDigits)
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
@@ -303,8 +328,7 @@ void max(const std::vector< Polygon >& polygons, std::istream& in, std::ostream&
   }
   else if (what == "VERTEXES")
   {
-    size_t m = std::accumulate(polygons.begin(), polygons.end(), size_t{0},
-      [](size_t acc, const Polygon& p){ return MaxSizeT{}(acc, p.points.size()); });
+    size_t m = std::accumulate(polygons.begin(), polygons.end(), size_t{ 0 }, AccMaxVertex{});
     out << m;
   }
   else
@@ -331,8 +355,7 @@ void min(const std::vector< Polygon >& polygons, std::istream& in, std::ostream&
   else if (what == "VERTEXES")
   {
     size_t start = std::numeric_limits< size_t >::max();
-    size_t m = std::accumulate(polygons.begin(), polygons.end(), start,
-      [](size_t acc, const Polygon& p){ return MinSizeT{}(acc, p.points.size()); });
+    size_t m = std::accumulate(polygons.begin(), polygons.end(), start, AccMinVertex{});
     out << (m == std::numeric_limits< size_t >::max() ? 0 : m);
   }
   else
@@ -347,17 +370,16 @@ void count(const std::vector< Polygon >& polygons, std::istream& in, std::ostrea
   in >> subcommand;
   if (subcommand == "EVEN")
   {
-    out << std::accumulate(polygons.begin(), polygons.end(), size_t{0}, CountIf{ IsEvenPoly{} });
+    out << std::accumulate(polygons.begin(), polygons.end(), size_t{ 0 }, CountIf{ &PredEven });
   }
   else if (subcommand == "ODD")
   {
-    out << std::accumulate(polygons.begin(), polygons.end(), size_t{0}, CountIf{ IsOddPoly{} });
+    out << std::accumulate(polygons.begin(), polygons.end(), size_t{ 0 }, CountIf{ &PredOdd });
   }
   else
   {
     const bool allDigits = !subcommand.empty() &&
-      std::all_of(subcommand.begin(), subcommand.end(),
-                  [](char c){ return isDigitChar(c); });
+      std::all_of(subcommand.begin(), subcommand.end(), isDigitChar);
     if (!allDigits)
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
@@ -367,7 +389,15 @@ void count(const std::vector< Polygon >& polygons, std::istream& in, std::ostrea
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
     }
-    out << std::accumulate(polygons.begin(), polygons.end(), size_t{0}, CountIf{ IsNumPoly{ n } });
+    struct CountIfNum
+    {
+      size_t n;
+      size_t operator()(size_t acc, const Polygon& p) const
+      {
+        return PredNumN(p, n) ? acc + 1 : acc;
+      }
+    };
+    out << std::accumulate(polygons.begin(), polygons.end(), size_t{ 0 }, CountIfNum{ n });
   }
 }
 
@@ -447,7 +477,7 @@ void rightshapes(const std::vector< Polygon >& polygons, std::istream& in, std::
       return HasRightAngle{}(p) ? acc + 1 : acc;
     }
   };
-  size_t cnt = std::accumulate(polygons.begin(), polygons.end(), size_t{0}, AddIfRight{});
+  size_t cnt = std::accumulate(polygons.begin(), polygons.end(), size_t{ 0 }, AddIfRight{});
   out << cnt;
 }
 
