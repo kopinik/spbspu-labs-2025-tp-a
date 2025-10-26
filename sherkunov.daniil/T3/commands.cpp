@@ -178,12 +178,19 @@ double AreaOfPoly::operator()(double acc, const Polygon& polygon) const
   {
     return acc;
   }
-  double sum = std::inner_product(p.begin(), p.end() - 1, p.begin() + 1, 0.0, AddDouble{}, subAreaOp);
-  double sum = std::inner_product(p.begin(), p.end() - 1, p.begin() + 1,
-                                 0.0, AddDouble{}, &subArea);
+
+  double sum = std::inner_product(
+    p.begin(), p.end() - 1,
+    p.begin() + 1,
+    0.0,
+    AddDouble{},
+    &subArea
+  );
+
   sum += subArea(p.back(), p.front());
   return acc + std::abs(sum) / 2.0;
 }
+
 
 double areaPolygon(const Polygon& polygon)
 {
