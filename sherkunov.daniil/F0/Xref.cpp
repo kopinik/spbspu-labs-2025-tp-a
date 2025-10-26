@@ -1,20 +1,202 @@
 #include "Xref.h"
+
+#include <algorithm>
+#include <cctype>
+#include <fstream>
+#include <functional>
+#include <iterator>
+#include <numeric>
+#include <sstream>
 #include <stdexcept>
 
 namespace sherkunov
 {
+
+namespace
+{
+
+struct IsAlnumChar
+{
+  bool operator()(unsigned char c) const
+  {
+    return std::isalnum(c) != 0;
+  }
+};
+
+struct IsAlphaChar
+{
+  bool operator()(unsigned char c) const
+  {
+    return std::isalpha(c) != 0;
+  }
+};
+
+struct IsNotAlphaChar
+{
+  bool operator()(char c) const
+  {
+    return IsAlphaChar{}(static_cast<unsigned char>(c)) == 0;
+  }
+};
+
+struct ToLowerChar
+{
+  char operator()(char c) const
+  {
+    return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+};
+
+struct IsDigitChar
+{
+  bool operator()(unsigned char c) const
+  {
+    return std::isdigit(c) != 0;
+  }
+};
+
+struct IsValidNameChar
+{
+  bool operator()(unsigned char c) const
+  {
+    return std::isalnum(c) || c == '_' || c == '-';
+  }
+};
+
+struct AccumMaxPos
+{
+  size_t operator()(size_t acc, const std::pair<const std::string, std::vector<size_t>> &p) const
+  {
+    if (p.second.empty()) {
+      return acc;
+    }
+    return std::max(acc, static_cast<size_t>(*std::max_element(p.second.begin(), p.second.end())));
+  }
+};
+
+struct JoinWithSpace
+{
+  std::string operator()(const std::string &acc, const std::string &s) const
+  {
+    return acc + " " + s;
+  }
+};
+
+struct PushToRefs
+{
+  std::map<std::string, std::vector<size_t>> *refs;
+  size_t *idx;
+
+  void operator()(std::string word) const
+  {
+    word.erase(std::remove_if(word.begin(), word.end(), IsNotAlphaChar{}), word.end());
+    if (!word.empty()) {
+      std::transform(word.begin(), word.end(), word.begin(), ToLowerChar{});
+      (*refs)[word].push_back(*idx);
+    }
+    ++(*idx);
+  }
+};
+
+struct PrintWithComma
+{
+  std::ostream *out;
+  bool first;
+
+  void operator()(size_t v)
+  {
+    if (!first) {
+      (*out) << ",";
+    }
+    (*out) << v;
+    first = false;
+  }
+};
+
+struct PrintRefLine
+{
+  std::ofstream *out;
+
+  void operator()(const std::pair<const std::string, std::vector<size_t>> &p)
+  {
+    (*out) << p.first << ":";
+    PrintWithComma printer{ out, true };
+    std::for_each(p.second.begin(), p.second.end(), printer);
+    (*out) << "\n";
+  }
+};
+
+struct ToCountPair
+{
+  std::pair<std::string, size_t> operator()(const std::pair<const std::string, std::vector<size_t>> &p) const
+  {
+    return std::make_pair(p.first, p.second.size());
+  }
+};
+
+struct ByCountDesc
+{
+  bool operator()(const std::pair<std::string, size_t> &a,
+                  const std::pair<std::string, size_t> &b) const
+  {
+    return a.second > b.second;
+  }
+};
+
+struct PrintCountLine
+{
+  void operator()(const std::pair<std::string, size_t> &p) const
+  {
+    std::cout << "  " << p.first << ": " << p.second << std::endl;
+  }
+};
+
+struct PrintPosSpace
+{
+  std::ostream *out;
+  void operator()(size_t v) const
+  {
+    (*out) << v << " ";
+  }
+};
+
+struct MergeAccum
+{
+  CrossReferenceSystem::TextData *dst;
+  size_t offset;
+
+  void operator()(const std::pair<const std::string, std::vector<size_t>> &pr) const
+  {
+    const std::string &w = pr.first;
+    const std::vector<size_t> &pos = pr.second;
+    std::vector<size_t> shifted;
+    shifted.reserve(pos.size());
+    std::transform(pos.begin(), pos.end(), std::back_inserter(shifted),
+                   Offset{ offset });
+    auto it = dst->references.find(w);
+    if (it != dst->references.end()) {
+      it->second.insert(it->second.end(), shifted.begin(), shifted.end());
+    } else {
+      dst->references[w] = shifted;
+    }
+  }
+
+  struct Offset
+  {
+    size_t off;
+    size_t operator()(size_t p) const { return p + off; }
+  };
+};
+
+}
 
 bool CrossReferenceSystem::isValidName(const std::string &name)
 {
   if (name.empty()) {
     return false;
   }
-  for (char c : name) {
-    if (!std::isalnum(c) && c != '_' && c != '-') {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(name.begin(), name.end(),
+                     [](char c){ return IsValidNameChar{}(static_cast<unsigned char>(c)); });
 }
 
 bool CrossReferenceSystem::isValidWord(const std::string &word)
@@ -22,49 +204,23 @@ bool CrossReferenceSystem::isValidWord(const std::string &word)
   if (word.empty()) {
     return false;
   }
-  for (char c : word) {
-    if (!std::isalpha(c)) {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(word.begin(), word.end(),
+                     [](char c){ return IsAlphaChar{}(static_cast<unsigned char>(c)); });
 }
 
 std::vector<std::string> CrossReferenceSystem::splitIntoWords(const std::string &content)
 {
-  std::vector<std::string> words;
-  std::string current_word;
-
-  for (char c : content) {
-    if (std::isspace(static_cast<unsigned char>(c))) {
-      if (!current_word.empty()) {
-        words.push_back(current_word);
-        current_word.clear();
-      }
-    } else {
-      current_word += c;
-    }
-  }
-
-  if (!current_word.empty()) {
-    words.push_back(current_word);
-  }
-
-  return words;
+  std::istringstream iss(content);
+  return std::vector<std::string>(std::istream_iterator<std::string>(iss),
+                                  std::istream_iterator<std::string>());
 }
 
 std::string CrossReferenceSystem::joinWords(const std::vector<std::string> &words)
 {
   if (words.empty()) {
-    return "";
+    return std::string();
   }
-
-  std::string result = words[0];
-  for (size_t i = 1; i < words.size(); ++i) {
-    result += " " + words[i];
-  }
-
-  return result;
+  return std::accumulate(std::next(words.begin()), words.end(), words.front(), JoinWithSpace{});
 }
 
 void CrossReferenceSystem::buildReferences(const std::string &text_name, const std::string &content)
@@ -72,24 +228,10 @@ void CrossReferenceSystem::buildReferences(const std::string &text_name, const s
   TextData &data = texts[text_name];
   data.content = content;
   data.references.clear();
-
   std::vector<std::string> words = splitIntoWords(content);
-
-  for (size_t position = 0; position < words.size(); ++position) {
-    std::string word = words[position];
-
-    std::string cleaned_word;
-    for (char c : word) {
-      if (std::isalpha(c)) {
-        cleaned_word += c;
-      }
-    }
-
-    if (!cleaned_word.empty()) {
-      std::transform(cleaned_word.begin(), cleaned_word.end(), cleaned_word.begin(), ::tolower);
-      data.references[cleaned_word].push_back(position);
-    }
-  }
+  size_t idx = 0;
+  PushToRefs push{ &data.references, &idx };
+  std::for_each(words.begin(), words.end(), push);
 }
 
 void CrossReferenceSystem::build(const std::string &text_name, const std::string &text_content)
@@ -103,7 +245,6 @@ void CrossReferenceSystem::build(const std::string &text_name, const std::string
   if (texts.find(text_name) != texts.end()) {
     throw std::runtime_error("<ALREADY EXISTS>");
   }
-
   buildReferences(text_name, text_content);
 }
 
@@ -117,15 +258,7 @@ void CrossReferenceSystem::reconstruct(const std::string &text_name, const std::
   const TextData &data = it->second;
   std::vector<std::string> words = splitIntoWords(data.content);
 
-  size_t max_position = 0;
-  for (const auto &ref : data.references) {
-    for (size_t pos : ref.second) {
-      if (pos > max_position) {
-        max_position = pos;
-      }
-    }
-  }
-
+  size_t max_position = std::accumulate(data.references.begin(), data.references.end(), size_t{0}, AccumMaxPos{});
   if (max_position >= words.size()) {
     throw std::runtime_error("<CORRUPTED INDEX>");
   }
@@ -140,7 +273,8 @@ void CrossReferenceSystem::reconstruct(const std::string &text_name, const std::
     if (std::ifstream(output_file)) {
       throw std::runtime_error("<IO EXISTS>");
     }
-    outfile << data.content;
+    PrintRefLine pr{ &outfile };
+    std::for_each(data.references.begin(), data.references.end(), pr);
     outfile.close();
   }
 }
@@ -155,16 +289,16 @@ void CrossReferenceSystem::concat(const std::string &new_name, const std::string
   }
 
   auto it1 = texts.find(name1);
-  if (it1 == std::end(texts)) {
-    throw std::runtime_error("<NOT FOUND: " + name1 + ">");
-  }
   auto it2 = texts.find(name2);
-  if (it2 == std::end(texts)) {
-    throw std::runtime_error("<NOT FOUND: " + name2 + ">");
+  if (it1 == texts.end()) {
+    throw std::runtime_error(std::string("<NOT FOUND: ") + name1 + ">");
+  }
+  if (it2 == texts.end()) {
+    throw std::runtime_error(std::string("<NOT FOUND: ") + name2 + ">");
   }
 
-  std::string combined_content = it1->second.content + " " + it2->second.content;
-  buildReferences(new_name, combined_content);
+  std::string combined = it1->second.content + " " + it2->second.content;
+  buildReferences(new_name, combined);
 }
 
 std::vector<size_t> CrossReferenceSystem::search(const std::string &text_name, const std::string &word)
@@ -177,11 +311,10 @@ std::vector<size_t> CrossReferenceSystem::search(const std::string &text_name, c
     throw std::runtime_error("<EMPTY WORD>");
   }
 
-  std::string search_word = word;
-  std::transform(search_word.begin(), search_word.end(), search_word.begin(), ::tolower);
-
+  std::string key = word;
+  std::transform(key.begin(), key.end(), key.begin(), ToLowerChar{});
   const auto &refs = it->second.references;
-  auto ref_it = refs.find(search_word);
+  auto ref_it = refs.find(key);
   if (ref_it != refs.end()) {
     return ref_it->second;
   }
@@ -197,22 +330,31 @@ void CrossReferenceSystem::replace(const std::string &text_name,
     throw std::runtime_error("<NOT FOUND>");
   }
 
-  std::string search_old_word = old_word;
-  std::transform(search_old_word.begin(), search_old_word.end(), search_old_word.begin(), ::tolower);
+  std::string search_old = old_word;
+  std::transform(search_old.begin(), search_old.end(), search_old.begin(), ToLowerChar{});
 
   TextData &data = it->second;
-  auto ref_it = data.references.find(search_old_word);
+  auto ref_it = data.references.find(search_old);
   if (ref_it == data.references.end()) {
     throw std::runtime_error("<WORD NOT FOUND>");
   }
 
   std::vector<std::string> words = splitIntoWords(data.content);
 
-  for (size_t pos : ref_it->second) {
-    if (pos < words.size()) {
-      words[pos] = new_word;
+  struct SetWordAt
+  {
+    std::vector<std::string> *words;
+    const std::string *value;
+
+    void operator()(size_t pos) const
+    {
+      if (pos < words->size()) {
+        (*words)[pos] = *value;
+      }
     }
-  }
+  };
+
+  std::for_each(ref_it->second.begin(), ref_it->second.end(), SetWordAt{ &words, &new_word });
 
   std::string new_content = joinWords(words);
   buildReferences(text_name, new_content);
@@ -237,7 +379,6 @@ void CrossReferenceSystem::insert(const std::string &text_name, size_t position,
   }
 
   words.insert(words.begin() + position, word);
-
   std::string new_content = joinWords(words);
   buildReferences(text_name, new_content);
 }
@@ -257,7 +398,6 @@ void CrossReferenceSystem::remove(const std::string &text_name, size_t start, si
   }
 
   words.erase(words.begin() + start, words.begin() + end + 1);
-
   std::string new_content = joinWords(words);
   buildReferences(text_name, new_content);
 }
@@ -269,14 +409,9 @@ void CrossReferenceSystem::import(const std::string &filename)
     throw std::runtime_error("<FILE NOT FOUND>");
   }
 
-  std::string content;
-  std::string line;
-  while (std::getline(infile, line)) {
-    if (!content.empty()) {
-      content += "\n";
-    }
-    content += line;
-  }
+  std::ostringstream oss;
+  oss << infile.rdbuf();
+  std::string content = oss.str();
 
   if (content.empty()) {
     throw std::runtime_error("<INVALID FORMAT>");
@@ -303,29 +438,9 @@ void CrossReferenceSystem::export_text(const std::string &text_name, const std::
     throw std::runtime_error("<IO ERROR>");
   }
 
-  for (const auto &ref : it->second.references) {
-    outfile << ref.first << ":";
-    for (size_t i = 0; i < ref.second.size(); ++i) {
-      if (i > 0) {
-        outfile << ",";
-      }
-      outfile << ref.second[i];
-    }
-    outfile << "\n";
-  }
-
+  PrintRefLine pr{ &outfile };
+  std::for_each(it->second.references.begin(), it->second.references.end(), pr);
   outfile.close();
-}
-
-namespace {
-struct ByCountDesc
-{
-  bool operator()(const std::pair<std::string, size_t> &a,
-                  const std::pair<std::string, size_t> &b) const
-  {
-    return a.second > b.second;
-  }
-};
 }
 
 void CrossReferenceSystem::stats(const std::string &text_name)
@@ -342,16 +457,15 @@ void CrossReferenceSystem::stats(const std::string &text_name)
   std::cout << "Total occurrences: " << words.size() << std::endl;
 
   std::vector<std::pair<std::string, size_t>> word_counts;
-  for (const auto &ref : data.references) {
-    word_counts.emplace_back(ref.first, ref.second.size());
-  }
+  word_counts.reserve(data.references.size());
+  std::transform(data.references.begin(), data.references.end(),
+                 std::back_inserter(word_counts), ToCountPair{});
 
   std::sort(word_counts.begin(), word_counts.end(), ByCountDesc{});
-
-  std::cout << "Top 5 words:" << std::endl;
-  for (size_t i = 0; i < std::min<size_t>(5, word_counts.size()); ++i) {
-    std::cout << "  " << word_counts[i].first << ": " << word_counts[i].second << std::endl;
+  if (word_counts.size() > 5) {
+    word_counts.resize(5);
   }
+  std::for_each(word_counts.begin(), word_counts.end(), PrintCountLine{});
 }
 
 void CrossReferenceSystem::merge(const std::string &new_name,
@@ -367,11 +481,11 @@ void CrossReferenceSystem::merge(const std::string &new_name,
 
   auto it1 = texts.find(name1);
   if (it1 == texts.end()) {
-    throw std::runtime_error("<NOT FOUND: " + name1 + ">");
+    throw std::runtime_error(std::string("<NOT FOUND: ") + name1 + ">");
   }
   auto it2 = texts.find(name2);
   if (it2 == texts.end()) {
-    throw std::runtime_error("<NOT FOUND: " + name2 + ">");
+    throw std::runtime_error(std::string("<NOT FOUND: ") + name2 + ">");
   }
 
   const TextData &data1 = it1->second;
@@ -384,22 +498,8 @@ void CrossReferenceSystem::merge(const std::string &new_name,
   new_data.content = data1.content + " " + data2.content;
   new_data.references = data1.references;
 
-  for (const auto &pair : data2.references) {
-    const std::string &word = pair.first;
-    const std::vector<size_t> &positions = pair.second;
-    std::vector<size_t> shifted_positions;
-    for (size_t pos : positions) {
-      shifted_positions.push_back(pos + word_count1);
-    }
-
-    if (new_data.references.find(word) != new_data.references.end()) {
-      new_data.references[word].insert(new_data.references[word].end(),
-                                       shifted_positions.begin(),
-                                       shifted_positions.end());
-    } else {
-      new_data.references[word] = shifted_positions;
-    }
-  }
+  MergeAccum acc{ &new_data, word_count1 };
+  std::for_each(data2.references.begin(), data2.references.end(), acc);
 
   texts[new_name] = new_data;
 }
@@ -438,7 +538,7 @@ int processCommandLineArguments(int argc, char **argv, CrossReferenceSystem &sys
 void runInteractiveMode(CrossReferenceSystem &system)
 {
   std::string command;
-  while (true) {
+  for (;;) {
     std::cout << "> ";
     if (!std::getline(std::cin, command)) {
       break;
@@ -494,10 +594,9 @@ void runInteractiveMode(CrossReferenceSystem &system)
         if (positions.empty()) {
           std::cout << "Word not found" << std::endl;
         } else {
+          PrintPosSpace printer{ &std::cout };
           std::cout << "Positions: ";
-          for (size_t pos2 : positions) {
-            std::cout << pos2 << " ";
-          }
+          std::for_each(positions.begin(), positions.end(), printer);
           std::cout << std::endl;
         }
       } else if (cmd == "replace") {
