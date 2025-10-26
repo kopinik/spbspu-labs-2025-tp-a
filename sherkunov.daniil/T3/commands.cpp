@@ -20,11 +20,6 @@ double subArea(const Point& a, const Point& b)
   return a.x * b.y - a.y * b.x;
 }
 
-static double subAreaOp(const Point& a, const Point& b)
-{
-  return subArea(a, b);
-}
-
 static bool isDigitChar(char c)
 {
   return std::isdigit(static_cast<unsigned char>(c)) != 0;
