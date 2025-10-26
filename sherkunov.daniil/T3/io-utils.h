@@ -8,7 +8,7 @@ namespace sherkunov
 {
   struct DelimiterIO
   {
-      char exp;
+    char exp;
   };
 
   class IoGuard
