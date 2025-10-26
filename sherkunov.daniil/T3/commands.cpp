@@ -108,13 +108,7 @@ struct AreaOfPoly
       return acc;
     }
 
-    double sum = std::inner_product(
-      p.begin(), p.end() - 1,
-      p.begin() + 1,
-      0.0,
-      AddDouble{},
-      &::sherkunov::subArea
-    );
+    double sum = std::inner_product(p.begin(), p.end() - 1, p.begin() + 1, 0.0, AddDouble{}, &::sherkunov::subArea);
 
     sum += ::sherkunov::subArea(p.back(), p.front());
     return acc + std::abs(sum) / 2.0;
