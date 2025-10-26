@@ -24,13 +24,13 @@ double subArea(const Point& a, const Point& b)
 namespace
 {
 
-bool isDigitChar(char c)
+struct IsDigitChar
 {
   bool operator()(char c) const
   {
     return c >= '0' && c <= '9';
   }
-}
+};
 
 struct AddDouble
 {
@@ -77,7 +77,7 @@ struct IsEvenPoly
 {
   bool operator()(const Polygon& p) const
   {
-	return (p.points.size() % 2) == 0;
+    return (p.points.size() % 2) == 0;
   }
 };
 
@@ -85,7 +85,7 @@ struct IsOddPoly
 {
   bool operator()(const Polygon& p) const
   {
-	return (p.points.size() % 2) == 1;
+    return (p.points.size() % 2) == 1;
   }
 };
 
@@ -94,7 +94,7 @@ struct IsNumPoly
   size_t n;
   bool operator()(const Polygon& p) const
   {
-	return p.points.size() == n;
+    return p.points.size() == n;
   }
 };
 
@@ -161,7 +161,7 @@ struct ByX
 {
   bool operator()(const Point& a, const Point& b) const
   {
-	return a.x < b.x;
+    return a.x < b.x;
   }
 };
 
@@ -348,7 +348,7 @@ void area(const std::vector< Polygon >& polygons, std::istream& in, std::ostream
   else
   {
     const bool allDigits = !subcommand.empty() &&
-      std::all_of(subcommand.begin(), subcommand.end(), isDigitChar{});
+      std::all_of(subcommand.begin(), subcommand.end(), IsDigitChar{});
     if (!allDigits)
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
@@ -428,7 +428,7 @@ void count(const std::vector< Polygon >& polygons, std::istream& in, std::ostrea
   else
   {
     const bool allDigits = !subcommand.empty() &&
-      std::all_of(subcommand.begin(), subcommand.end(), isDigitChar);
+      std::all_of(subcommand.begin(), subcommand.end(), IsDigitChar{});
     if (!allDigits)
     {
       throw std::logic_error("<WRONG SUBCOMMAND>");
