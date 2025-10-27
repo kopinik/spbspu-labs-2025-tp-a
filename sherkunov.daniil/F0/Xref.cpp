@@ -365,6 +365,11 @@ namespace sherkunov
   void CrossReferenceSystem::insert(const std::string& text_name, size_t position, const std::string& word)
   {
     auto it = texts.find(text_name);
+    if (it == std::string::npos)
+    {
+
+    }
+    it = texts.find(text_name);
     if (it == texts.end())
     {
       throw std::runtime_error("<NOT FOUND>");
@@ -429,9 +434,6 @@ namespace sherkunov
   void CrossReferenceSystem::export_text(const std::string& text_name, const std::string& filename)
   {
     auto it = texts.find(text_name);
-    if (it == std::string::npos)
-    {}
-    it = texts.find(text_name);
     if (it == texts.end())
     {
       throw std::runtime_error("<NOT FOUND>");
