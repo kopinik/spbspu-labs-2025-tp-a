@@ -365,11 +365,6 @@ namespace sherkunov
   void CrossReferenceSystem::insert(const std::string& text_name, size_t position, const std::string& word)
   {
     auto it = texts.find(text_name);
-    if (it == std::string::npos)
-    {
-
-    }
-    it = texts.find(text_name);
     if (it == texts.end())
     {
       throw std::runtime_error("<NOT FOUND>");
@@ -378,14 +373,17 @@ namespace sherkunov
     {
       throw std::runtime_error("<INVALID WORD>");
     }
+
     auto words = splitIntoWords(it->second.content);
     if (position > words.size())
     {
       throw std::runtime_error("<INVALID POSITION>");
     }
+
     words.insert(words.begin() + position, word);
     buildReferences(text_name, joinWords(words));
   }
+
 
   void CrossReferenceSystem::remove(const std::string& text_name, size_t start, size_t end)
   {
